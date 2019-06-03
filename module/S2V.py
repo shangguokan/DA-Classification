@@ -127,7 +127,7 @@ def S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_
         if with_extra_features:
             inputs = [
                 Input(shape=input_shape, dtype='int32'),
-                Input(shape=(21,), dtype='float32')
+                Input(shape=(3,), dtype='float32')
             ]
 
             f_f_layer_1 = Dense(units=n_hidden, activation='tanh')

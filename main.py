@@ -100,7 +100,7 @@ for trans in corpus.iter_transcripts():
 
 assert len(DAMSL_tags) == 42
 
-max_seq_len = 10
+max_seq_len = 32
 tag_lb = LabelBinarizer().fit(list(DAMSL_tags))
 spk_lb = LabelBinarizer().fit(['A', 'B', '-'])
 for conversation_id in train_set_idx + valid_set_idx + test_set_idx:
@@ -116,19 +116,22 @@ for conversation_id in train_set_idx + valid_set_idx + test_set_idx:
 
 X = dict()
 Y = dict()
-
 for key, conversation_list in zip(['train', 'valid', 'test'], [train_set_idx, valid_set_idx, test_set_idx]):
-    X[key] = list(np.concatenate([UTT[conversation_id] for conversation_id in conversation_list], axis=1))
+    list1 = list(np.concatenate([UTT[conversation_id] for conversation_id in conversation_list], axis=1))
+    list2 = list(np.concatenate([SPK[conversation_id] for conversation_id in conversation_list], axis=1))
+    X[key] = [None] * (len(list1) + len(list2))
+    X[key][::2] = list1
+    X[key][1::2] = list2
     Y[key] = np.concatenate([TAG[conversation_id] for conversation_id in conversation_list], axis=0)
 
 ########################
 
 word_vectors_name = 'News'
 word_vectors = utlis.load_word_vectors('resource/GoogleNews-vectors-negative300-SLIM.bin.gz', frequency)
-fine_tune_word_vectors = False
-with_extra_features = False
+fine_tune_word_vectors = True
+with_extra_features = True
 module_name = 'TIXIER'
-epochs = 1
+epochs = 50
 path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '/'
 os.mkdir(path_to_results)
 
@@ -149,4 +152,4 @@ best_epoch = np.where(val_categorical_accuracies == val_categorical_accuracies.m
 print(" - best epoch: " + str(best_epoch))
 model = utlis.load_keras_model(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
 
-model.evaluate(X['test'], Y['test'])
+print(model.evaluate(X['test'], Y['test']))

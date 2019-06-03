@@ -13,7 +13,7 @@ def get_sub_model(input_shape, n_hidden, dropout_rate, word_vectors_name, fine_t
     if with_extra_features:
         inputs = [
             Input(shape=input_shape, dtype='int32'),
-            Input(shape=(21,), dtype='float32')
+            Input(shape=(3,), dtype='float32')
         ]
     else:
         inputs = Input(shape=input_shape, dtype='int32')
@@ -53,7 +53,7 @@ def TIXIER(pre_context_size, post_context_size, input_shape, recurrent_name, poo
     if with_extra_features:
         inputs = [
             [Input(shape=input_shape, dtype='int32'),
-             Input(shape=(21,), dtype='float32')]
+             Input(shape=(3,), dtype='float32')]
             for _ in range(context_size)
         ]
     else:

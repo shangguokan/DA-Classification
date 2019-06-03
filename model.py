@@ -18,7 +18,7 @@ def train(word_vectors_name, fine_tune_word_vectors,
 
     context_size = pre_context_size + 1 + post_context_size
 
-    n_hidden = 32
+    n_hidden = 64
     batch_size = 64
     dropout_rate = 0.5
 
@@ -32,7 +32,7 @@ def train(word_vectors_name, fine_tune_word_vectors,
     if with_extra_features:
         inputs = utlis.flatten([
             [Input(shape=(max_seq_len,), dtype='int32'),
-             Input(shape=(2,), dtype='float32')]
+             Input(shape=(3,), dtype='float32')]
             for _ in range(context_size)
         ])
     else:
