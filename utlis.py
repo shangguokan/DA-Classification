@@ -2,7 +2,19 @@ import os
 import json
 import numpy as np
 from gensim.models import Word2Vec
+
+import keras_bert
+import keras_transformer
+import tensorflow as tf
 from keras.models import load_model
+from module.LD import Bias
+from module.attention_with_vec import AttentionWithVec
+from module.attention_with_context import AttentionWithContext
+from module.attention_with_time_decay import AttentionWithTimeDecay
+from module.TIXIER import Sum
+from module.TIXIER import ConcatenateFeatures
+from module.TIXIER import ConcatenateContexts
+from module.S2V import Max
 
 import matplotlib
 if os.environ.get('DISPLAY', '') == '':
@@ -70,5 +82,21 @@ def plot_and_save_history(history, path_to_results):
 def load_keras_model(path):
     return load_model(
         path,
-        custom_objects={}
+        custom_objects={
+            'tf': tf,
+            'Bias': Bias,
+            'AttentionWithVec': AttentionWithVec,
+            'AttentionWithContext': AttentionWithContext,
+            'AttentionWithTimeDecay': AttentionWithTimeDecay,
+            'TokenEmbedding': keras_bert.bert.TokenEmbedding,
+            'PositionEmbedding': keras_bert.bert.PositionEmbedding,
+            'LayerNormalization': keras_bert.bert.LayerNormalization,
+            'gelu': keras_bert.bert.gelu,
+            'MultiHeadAttention': keras_transformer.transformer.MultiHeadAttention,
+            'FeedForward': keras_transformer.transformer.FeedForward,
+            'Sum': Sum,
+            'Max': Max,
+            'ConcatenateFeatures': ConcatenateFeatures,
+            'ConcatenateContexts': ConcatenateContexts
+        }
     )

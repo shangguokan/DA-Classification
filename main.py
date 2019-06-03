@@ -12,7 +12,7 @@ from sklearn.preprocessing import LabelBinarizer
 from collections import defaultdict, OrderedDict
 from keras.preprocessing.sequence import pad_sequences
 
-corpus = CorpusReader('dataset/swda/swda/swda')
+corpus = CorpusReader('dataset/swda/swda')
 UTT = defaultdict(list)
 TAG = defaultdict(list)
 SPK = defaultdict(list)
@@ -128,7 +128,7 @@ word_vectors = utlis.load_word_vectors('resource/GoogleNews-vectors-negative300-
 fine_tune_word_vectors = False
 with_extra_features = False
 module_name = 'TIXIER'
-epochs = 10
+epochs = 1
 path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '/'
 os.mkdir(path_to_results)
 
@@ -142,10 +142,10 @@ history = model.train(
 utlis.plot_and_save_history(history, path_to_results)
 
 ####################
-print("load the latest best model based on val_loss...")
-# Load *the latest best model* according to the quantity monitored (val_loss)
-val_losses = np.array(json.load(open(path_to_results+'training_history.json'))['val_loss'])
-best_epoch = np.where(val_losses == val_losses.min())[0][-1] + 1  # epochs count from 1
+print("load the latest best model based on val_categorical_accuracy...")
+# Load *the latest best model* according to the quantity monitored (val_categorical_accuracy)
+val_categorical_accuracies = np.array(json.load(open(path_to_results+'training_history.json'))['val_categorical_accuracy'])
+best_epoch = np.where(val_categorical_accuracies == val_categorical_accuracies.max())[0][-1] + 1  # epochs count from 1
 print(" - best epoch: " + str(best_epoch))
 model = utlis.load_keras_model(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
 

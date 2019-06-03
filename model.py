@@ -4,7 +4,7 @@ import datetime
 from time import time
 from keras.models import Model
 from keras.layers import Input, Dense
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 from module.S2V import S2V
 from module.HAN import HAN
@@ -24,7 +24,9 @@ def train(word_vectors_name, fine_tune_word_vectors,
 
     os.mkdir(path_to_results+'model_on_epoch_end')
     model_checkpoint = ModelCheckpoint(filepath=path_to_results+'model_on_epoch_end/'+'{epoch}.h5', monitor="val_loss", verbose=1, save_best_only=False, save_weights_only=False, mode='min', period=1)
-    callbacks = [model_checkpoint]
+    early_stopping = EarlyStopping(monitor='val_categorical_accuracy', min_delta=0.0001, patience=5, verbose=0, mode='auto', baseline=None, restore_best_weights=False)
+
+    callbacks = [model_checkpoint, early_stopping]
 
     # define inputs
     if with_extra_features:
