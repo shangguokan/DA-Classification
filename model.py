@@ -117,7 +117,8 @@ def train(word_vectors_name, fine_tune_word_vectors,
             fine_tune_word_vectors=fine_tune_word_vectors,
             word_vectors=word_vectors,
 
-            with_extra_features=with_extra_features
+            with_extra_features=with_extra_features,
+            with_last_f_f_layer=False
         )
 
     model = Model(inputs, Dense(units=42, activation='softmax')(module(inputs)))

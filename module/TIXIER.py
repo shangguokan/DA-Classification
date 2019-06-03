@@ -90,11 +90,15 @@ def TIXIER(pre_context_size, post_context_size, input_shape, recurrent_name, poo
         return_sequences=True
     )
     pooling_layer = S2V.get_pooling_layer(name=pooling_name)
-    f_f_layer = Dense(units=n_hidden, activation='tanh')
+    # f_f_layer = Dense(units=n_hidden, activation='tanh')
 
-    outputs = f_f_layer(pooling_layer(recurrent_layer(
+    # outputs = f_f_layer(pooling_layer(recurrent_layer(
+    #     ConcatenateContexts(axis=1)(padded)
+    # )))
+
+    outputs = pooling_layer(recurrent_layer(
         ConcatenateContexts(axis=1)(padded)
-    )))
+    ))
 
     if with_extra_features:
         inputs = utlis.flatten(inputs)

@@ -128,7 +128,7 @@ for key, conversation_list in zip(['train', 'valid', 'test'], [train_set_idx, va
 
 word_vectors_name = 'News'
 word_vectors = utlis.load_word_vectors('resource/GoogleNews-vectors-negative300-SLIM.bin.gz', frequency)
-fine_tune_word_vectors = True
+fine_tune_word_vectors = False
 with_extra_features = True
 module_name = 'TIXIER'
 epochs = 50
