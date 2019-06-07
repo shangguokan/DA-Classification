@@ -16,12 +16,10 @@ corpus = CorpusReader('dataset/swda/swda')
 UTT = defaultdict(list)
 TAG = defaultdict(list)
 SPK = defaultdict(list)
+DAMSL_tags = set()
 
 vocabulary = OrderedDict({'<TOKEN_PAD>': 0, '<PRE_CONTEXT_PAD>': 1, '<POST_CONTEXT_PAD>': 2})
 frequency = OrderedDict({'<TOKEN_PAD>': 0, '<PRE_CONTEXT_PAD>': 1, '<POST_CONTEXT_PAD>': 1})
-
-DAMSL_tags = set()
-max_seq_len = 0
 
 pre_context_size = 3
 post_context_size = 0
@@ -36,47 +34,29 @@ for trans in corpus.iter_transcripts():
         UTT[conversation_id].extend([[vocabulary['<PRE_CONTEXT_PAD>']]]*pre_context_size)
         SPK[conversation_id].extend(['-']*pre_context_size)
 
-    # swda.py#195 should be commented out, to include any utterance with act_tag ended with a '@' (e.g. 'b@') in trans.utterances,
-    # even though @ marked slash-units with bad segmentation, they are important for understanding the conversation
-    # check section 1c of the Coders' Manual http://www.stanford.edu/~jurafsky/ws97/manual.august1.html
-    for utt_idx, utt in enumerate(trans.utterances):
-        utt_tag = utt.damsl_act_tag()
-        # resolve issue related to tag '+'
-        # check section 2 of the Coders' Manual:
-        if utt_tag == '+':
-            for i in reversed(range(utt_idx)):
-                if trans.utterances[i].caller == utt.caller and trans.utterances[i].damsl_act_tag() != '+':
-                    utt_tag = trans.utterances[i].damsl_act_tag()
-                    break
-        DAMSL_tags.add(utt_tag)
+    for utt in trans.utterances:
+        words = ' '.join(utt.text_words(filter_disfluency=True))
+        # print(words)
+        words = re.sub(r'<<.*>>', '', words)
+        words = re.sub(r'\*.*$', '', words)
+        words = re.sub(r'[#)(]', '', words)
+        words = re.sub(r'--', '', words)
+        words = re.sub(r' -$', '', words)
+        while True:
+            output = re.sub(r'([A-Z]) ([A-Z])\b', '\\1\\2', words)
+            if output == words:
+                break
+            words = output
+        tokenizer = nltk.tokenize.TweetTokenizer()
+        words = tokenizer.tokenize(words)
+        words = ' '.join(words)
+        words = re.sub(r' -s', 's', words)
+        words = re.sub(r' -', '-', words)
+        # print(words)
 
-        if utt_tag == 'x':
-            # print(utt.text)
-            words = re.sub(r'[#/]', '', utt.text).strip()
-            words = [(str(s) + '>').strip() for s in words.split('>') if s]
-            words = ' '.join(words)
-            # print(words)
-        else:
-            words = ' '.join(utt.text_words(filter_disfluency=True))
-            # print(words)
-            words = re.sub(r' -$', '', words)
-            words = re.sub(r' --$', '', words)
-            words = re.sub(r'^-- ', '', words)
-            words = re.sub(r'[#()]', '', words)
-            tokenizer = nltk.tokenize.TweetTokenizer()
-            words = tokenizer.tokenize(words)
-            words = ' '.join(words)
-            words = re.sub(r' -', '-', words)
-            words = re.sub(r'< < ', '<<', words)
-            words = re.sub(r' > >', '>>', words)
-            # print(words)
         words = words.split()
-
-        if len(words) == 0:
+        if len(words) == 0 or words == ['.']:
             continue
-
-        if len(words) > max_seq_len:
-            max_seq_len = len(words)
 
         # words to indexes
         w2i = []
@@ -90,21 +70,37 @@ for trans in corpus.iter_transcripts():
                 w2i.append(vocabulary[word])
                 frequency[word] += 1
 
-        UTT[conversation_id].append(w2i)
-        TAG[conversation_id].append(utt_tag)
-        SPK[conversation_id].append(utt.caller)
+        utt_tag = utt.damsl_act_tag()
+        if utt_tag != '+':
+            UTT[conversation_id].append(w2i)
+            TAG[conversation_id].append(utt_tag)
+            SPK[conversation_id].append(utt.caller)
+            DAMSL_tags.add(utt_tag)
+        # resolve issue related to tag '+' (check section 2 of the Coders' Manual)
+        else:
+            concatenated = False
+            for i in reversed(range(len(UTT[conversation_id]))):
+                if SPK[conversation_id][i] == utt.caller:
+                    UTT[conversation_id][i].extend(w2i)
+                    concatenated = True
+                    break
+            # swda.py#195 should be commented out
+            assert concatenated is True
 
     if post_context_size > 0:
         UTT[conversation_id].extend([[vocabulary['<POST_CONTEXT_PAD>']]]*post_context_size)
         SPK[conversation_id].extend(['-']*post_context_size)
 
-assert len(DAMSL_tags) == 42
+seq_lens = []
+for conversation_id in train_set_idx + valid_set_idx + test_set_idx:
+    for utt in UTT[conversation_id]:
+        seq_lens.append(len(utt))
+max_seq_len = 50  # max(seq_lens)
 
-max_seq_len = 32
 tag_lb = LabelBinarizer().fit(list(DAMSL_tags))
 spk_lb = LabelBinarizer().fit(['A', 'B', '-'])
 for conversation_id in train_set_idx + valid_set_idx + test_set_idx:
-    UTT[conversation_id] = pad_sequences(UTT[conversation_id], maxlen=max_seq_len, padding='post')
+    UTT[conversation_id] = pad_sequences(UTT[conversation_id], maxlen=max_seq_len, padding='post', truncating='post')
     TAG[conversation_id] = tag_lb.transform(TAG[conversation_id])
     SPK[conversation_id] = spk_lb.transform(SPK[conversation_id])
 
@@ -112,7 +108,6 @@ for conversation_id in train_set_idx + valid_set_idx + test_set_idx:
         n_sample = len(TAG[conversation_id])
         UTT[conversation_id] = [UTT[conversation_id][i:i+n_sample] for i in range(context_size)]
         SPK[conversation_id] = [SPK[conversation_id][i:i+n_sample] for i in range(context_size)]
-
 
 X = dict()
 Y = dict()
