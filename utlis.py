@@ -7,6 +7,7 @@ import keras_bert
 import keras_transformer
 import tensorflow as tf
 from keras.models import load_model
+from sklearn.decomposition import PCA
 from module.LD import Bias
 from module.attention_with_vec import AttentionWithVec
 from module.attention_with_context import AttentionWithContext
@@ -24,31 +25,35 @@ if os.environ.get('DISPLAY', '') == '':
 import matplotlib.pyplot as plt
 
 
-def load_word_vectors(path_to_word2vec, word_frequency):
-    word_vector_dim = 300
-    vocabulary = list(word_frequency.keys())
+def load_word2vec(path, vocabulary, wv_dim, PCA_dim):
+    vocabulary = list(vocabulary.keys())
+    model = Word2Vec(size=wv_dim, min_count=1)
+    model.build_vocab_from_freq(dict.fromkeys(vocabulary, 1))
 
-    word_vectors = Word2Vec(size=word_vector_dim, min_count=1)
-    word_vectors.build_vocab_from_freq(word_frequency)
-
-    word_vectors.intersect_word2vec_format(path_to_word2vec, binary=True)
+    model.intersect_word2vec_format(path, binary=True)
 
     # Words without an entry in the binary file are silently initialized to random values.
     # We can detect those vectors via their norms which approach zero.
-    words_zero_norm = [word for word in word_vectors.wv.vocab if np.linalg.norm(word_vectors[word]) < 0.05]
-    print(' - words not in GoogleNews: %d / %d' % (len(words_zero_norm), len(vocabulary) - 1), words_zero_norm[:50])
+    words_zero_norm = [word for word in model.wv.vocab if np.linalg.norm(model.wv[word]) < 0.05]
+    print(' - OOV words: %d / %d' % (len(words_zero_norm), len(vocabulary) - 1), words_zero_norm[:50])
 
-    embeddings = np.zeros((len(vocabulary), word_vector_dim))
-    # the 0-th row for <TOKEN_PAD>, stays at zero
-    # the 1-th and  2-th rows for <PRE_CONTEXT_PAD> and <POST_CONTEXT_PAD> and OOV words are randomly initialized
-    for index, word in enumerate(vocabulary[1:], 1):
-        embeddings[index] = word_vectors[word]
+    embeddings = np.zeros((len(vocabulary), wv_dim))
+    for index, word in enumerate(vocabulary):
+        embeddings[index] = model.wv[word]
 
-    # from sklearn.decomposition import PCA
-    # embeddings = PCA(n_components=21).fit_transform(embeddings)
-    # embeddings[0] = 0
+    if PCA_dim < wv_dim:
+        embeddings = PCA(n_components=PCA_dim).fit_transform(embeddings)
 
+    embeddings[0] = 0
     return embeddings
+
+
+def train_and_save_word2vec(sentences, wv_dim, path):
+    model = Word2Vec(size=wv_dim, min_count=1)
+    model.build_vocab(sentences)
+
+    model.train(sentences, total_examples=len(sentences), epochs=30)
+    model.wv.save_word2vec_format(path, binary=True)
 
 
 def flatten(list_of_list):

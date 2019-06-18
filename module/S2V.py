@@ -15,7 +15,7 @@ from keras.layers import Layer, Input, Embedding, LSTM, GRU, Lambda, Dropout, Bi
 
 
 def get_embdedding_layer(name, embedding_matrix, max_sequence_length, trainable):
-    if name == 'News':
+    if name == 'Word2Vec':
         layer = Embedding(
             embedding_matrix.shape[0],
             embedding_matrix.shape[1],
@@ -24,7 +24,7 @@ def get_embdedding_layer(name, embedding_matrix, max_sequence_length, trainable)
             trainable=trainable,
             mask_zero=True
         )
-    elif name == 'BERT':
+    elif name == 'bert':
         layer = load_trained_bert_from_checkpoint(
             config_file='resource/cased_L-12_H-768_A-12/bert_config.json',
             checkpoint_file='resource/cased_L-12_H-768_A-12/bert_model.ckpt',
