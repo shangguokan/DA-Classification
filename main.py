@@ -9,16 +9,17 @@ from dataset.loader import load_swda_corpus
 from sklearn.preprocessing import LabelBinarizer
 from keras.preprocessing.sequence import pad_sequences
 
-conversation_list = train_set_idx + valid_set_idx + test_set_idx
-corpus, vocabulary, tag_set, speaker_set = load_swda_corpus(conversation_list, concatenate_interruption=True)
-
-sentences = [sent for cid in train_set_idx + valid_set_idx for sent in corpus[cid]['text']]
-utlis.train_and_save_word2vec(sentences, wv_dim=64, path='resource/wv_swda.bin')
-
-word_vectors = utlis.load_word2vec('resource/wv_swda.bin', vocabulary, wv_dim=64, PCA_dim=64)
-# word_vectors = utlis.load_word2vec('resource/GoogleNews-vectors-negative300-SLIM.bin.gz', vocabulary, wv_dim=300, PCA_dim=64)
-
 for pre_context_size, post_context_size in ((3,0),(3,3),(5,0),(5,5),(7,0),(7,7),(9,0),(9,9),(11,0),(11,11),(13,0),(13,13)):
+    conversation_list = train_set_idx + valid_set_idx + test_set_idx
+    corpus, vocabulary, tag_set, speaker_set = load_swda_corpus(conversation_list, concatenate_interruption=True)
+
+    wv_dim = 64
+    sentences = [sent for cid in train_set_idx + valid_set_idx for sent in corpus[cid]['text']]
+    utlis.train_and_save_word2vec(sentences, wv_dim=wv_dim, path='resource/wv_swda.bin')
+
+    word_vectors = utlis.load_word2vec('resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, PCA_dim=64)
+    # word_vectors = utlis.load_word2vec('resource/GoogleNews-vectors-negative300-SLIM.bin.gz', vocabulary, wv_dim=300, PCA_dim=64)
+
     context_size = pre_context_size + 1 + post_context_size
 
     seq_lens = []
@@ -93,6 +94,6 @@ for pre_context_size, post_context_size in ((3,0),(3,3),(5,0),(5,5),(7,0),(7,7),
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('pre_context_size', 'post_context_size', 'val_loss', 'val_accuracy', 'test_loss', 'test_accuracy')))
+            dict(((k, eval(k)) for k in ('wv_dim', 'pre_context_size', 'post_context_size', 'best_epoch', 'val_loss', 'val_accuracy', 'test_loss', 'test_accuracy')))
         ))
 
