@@ -24,7 +24,7 @@ def get_embdedding_layer(name, embedding_matrix, max_sequence_length, trainable)
             trainable=trainable,
             mask_zero=True
         )
-    elif name == 'bert':
+    elif name == 'BERT':
         layer = load_trained_bert_from_checkpoint(
             config_file='resource/cased_L-12_H-768_A-12/bert_config.json',
             checkpoint_file='resource/cased_L-12_H-768_A-12/bert_model.ckpt',

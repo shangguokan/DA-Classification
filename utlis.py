@@ -60,9 +60,9 @@ def flatten(list_of_list):
     return [item for sublist in list_of_list for item in sublist]
 
 
-def plot_and_save_history(history, path_to_results):
-    with open(path_to_results+'training_history.json', 'w') as fp:
-        fp.write(json.dumps(history))
+def save_and_plot_history(history, path_to_results):
+    with open(path_to_results+'history.json', 'w') as f:
+        f.write(json.dumps(history))
 
     epochs = np.arange(1, len(history['loss'])+1)
     for key in history.keys():
@@ -82,6 +82,10 @@ def plot_and_save_history(history, path_to_results):
 
             plt.savefig(path_to_results+k+'.png', dpi=300, bbox_inches='tight')
             plt.clf()
+
+
+def load_history(path_to_results):
+    return json.load(open(path_to_results + 'history.json'))
 
 
 def load_keras_model(path):
