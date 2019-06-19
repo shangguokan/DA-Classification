@@ -71,6 +71,7 @@ for pre_context_size, post_context_size in ((3,0),(3,3),(5,0),(5,5),(7,0),(7,7),
     os.mkdir(path_to_results)
 
     history = model.train(
+        wv_dim,
         word_vectors_name, fine_tune_word_vectors,
         with_extra_features, module_name,
         epochs, pre_context_size, post_context_size, X, Y,
@@ -86,11 +87,11 @@ for pre_context_size, post_context_size in ((3,0),(3,3),(5,0),(5,5),(7,0),(7,7),
     val_loss_list = np.array(history['val_loss'])
     val_accuracy_list = np.array(history['val_categorical_accuracy'])
 
-    best_epoch = np.where(val_accuracy_list == val_accuracy_list.max())[0][-1] + 1  # epochs count from 1
-    model = utlis.load_keras_model(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
+    best_epoch = int(np.where(val_accuracy_list == val_accuracy_list.max())[0][-1] + 1)  # epochs count from 1
+    trained_model = utlis.load_keras_model(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
 
     val_loss, val_accuracy = val_loss_list[best_epoch-1], val_accuracy_list[best_epoch-1]
-    test_loss, test_accuracy = model.evaluate(X['test'], Y['test'])
+    test_loss, test_accuracy = trained_model.evaluate(X['test'], Y['test'])
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
