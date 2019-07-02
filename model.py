@@ -11,7 +11,7 @@ from module.HAN import HAN
 from module.LD import LD
 from module.TIXIER import TIXIER
 
-def train(wv_dim, word_vectors_name, fine_tune_word_vectors,
+def train(wv_dim, fine_tune_word_vectors,
     with_extra_features, module_name,
     epochs, pre_context_size, post_context_size, X, Y,
     max_seq_len, word_vectors, path_to_results):
@@ -57,7 +57,6 @@ def train(wv_dim, word_vectors_name, fine_tune_word_vectors,
             is_base_network=False,
 
             with_embdedding_layer=True,
-            word_vectors_name=word_vectors_name,
             fine_tune_word_vectors=fine_tune_word_vectors,
             word_vectors=word_vectors,
 
@@ -76,7 +75,6 @@ def train(wv_dim, word_vectors_name, fine_tune_word_vectors,
             is_base_network=False,
 
             with_embdedding_layer=True,
-            word_vectors_name=word_vectors_name,
             fine_tune_word_vectors=fine_tune_word_vectors,
             word_vectors=word_vectors,
 
@@ -96,7 +94,6 @@ def train(wv_dim, word_vectors_name, fine_tune_word_vectors,
             is_base_network=False,
 
             with_embdedding_layer=True,
-            word_vectors_name=word_vectors_name,
             fine_tune_word_vectors=fine_tune_word_vectors,
             word_vectors=word_vectors,
 
@@ -113,7 +110,6 @@ def train(wv_dim, word_vectors_name, fine_tune_word_vectors,
             is_base_network=True,
 
             with_embdedding_layer=True,
-            word_vectors_name=word_vectors_name,
             fine_tune_word_vectors=fine_tune_word_vectors,
             word_vectors=word_vectors,
 

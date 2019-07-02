@@ -9,7 +9,7 @@ from keras.utils import plot_model
 from keras.layers import Input, Lambda, Dense
 from module.S2V import S2V
 
-def HAN(context_size, input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features):
+def HAN(context_size, input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, fine_tune_word_vectors, word_vectors, with_extra_features):
     if with_extra_features:
         inputs = [
             [Input(shape=input_shape, dtype='int32'),
@@ -22,7 +22,7 @@ def HAN(context_size, input_shape, recurrent_name, pooling_name, n_hidden, dropo
             for _ in range(context_size)
         ]
 
-    s2v_1 = S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features, with_last_f_f_layer=False)
+    s2v_1 = S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, fine_tune_word_vectors, word_vectors, with_extra_features, with_last_f_f_layer=False)
 
     # convert list of 2D tensors to a 3D tensor (None, context_size, n_hidden)
     stack_layer = Lambda(K.stack, arguments={'axis': 1})
@@ -30,7 +30,7 @@ def HAN(context_size, input_shape, recurrent_name, pooling_name, n_hidden, dropo
     # merge_mode='concat'
     input_shape = (context_size, n_hidden*2)
 
-    s2v_2 = S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer=False, word_vectors_name=None, fine_tune_word_vectors=None, word_vectors=None, with_extra_features=False, with_last_f_f_layer=False)
+    s2v_2 = S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer=False, fine_tune_word_vectors=None, word_vectors=None, with_extra_features=False, with_last_f_f_layer=False)
 
     f_f_layer = Dense(units=n_hidden, activation='tanh')
 

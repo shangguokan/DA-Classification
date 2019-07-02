@@ -9,7 +9,7 @@ from module.attention_with_context import AttentionWithContext
 from module.attention_with_time_decay import AttentionWithTimeDecay
 
 
-def get_sub_model(input_shape, n_hidden, dropout_rate, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features):
+def get_sub_model(input_shape, n_hidden, dropout_rate, fine_tune_word_vectors, word_vectors, with_extra_features):
     if with_extra_features:
         inputs = [
             Input(shape=input_shape, dtype='int32'),
@@ -19,7 +19,6 @@ def get_sub_model(input_shape, n_hidden, dropout_rate, word_vectors_name, fine_t
         inputs = Input(shape=input_shape, dtype='int32')
 
     embdedding_layer = S2V.get_embdedding_layer(
-        name=word_vectors_name,
         embedding_matrix=word_vectors,
         max_sequence_length=input_shape[0],
         trainable=fine_tune_word_vectors
@@ -45,7 +44,7 @@ def get_sub_model(input_shape, n_hidden, dropout_rate, word_vectors_name, fine_t
     return model
 
 
-def TIXIER(pre_context_size, post_context_size, input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features):
+def TIXIER(pre_context_size, post_context_size, input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, fine_tune_word_vectors, word_vectors, with_extra_features):
     if pre_context_size <= 0:
         raise ValueError('pre_context_size should greater than 0')
 
@@ -62,7 +61,7 @@ def TIXIER(pre_context_size, post_context_size, input_shape, recurrent_name, poo
             for _ in range(context_size)
         ]
 
-    sub_model = get_sub_model(input_shape, n_hidden, dropout_rate, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features)
+    sub_model = get_sub_model(input_shape, n_hidden, dropout_rate, fine_tune_word_vectors, word_vectors, with_extra_features)
     attention_layer = AttentionWithVec(attend_mode='sum')
     # convert list of 2D tensors to a 3D tensor (None, left_context_size, n_hidden)
     stack_layer = Lambda(K.stack, arguments={'axis': 1})

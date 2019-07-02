@@ -9,35 +9,19 @@ import keras.backend as K
 from keras.models import Model
 from keras.utils import plot_model
 from keras.initializers import Constant
-from module.BERT import load_trained_bert_from_checkpoint
 from module.attention_with_context import AttentionWithContext
 from keras.layers import Layer, Input, Embedding, LSTM, GRU, Lambda, Dropout, Bidirectional, Dense, Concatenate, RepeatVector
 
 
-def get_embdedding_layer(name, embedding_matrix, max_sequence_length, trainable):
-    if name == 'Word2Vec':
-        layer = Embedding(
-            embedding_matrix.shape[0],
-            embedding_matrix.shape[1],
-            embeddings_initializer=Constant(embedding_matrix),
-            input_length=max_sequence_length,
-            trainable=trainable,
-            mask_zero=True
-        )
-    elif name == 'BERT':
-        layer = load_trained_bert_from_checkpoint(
-            config_file='resource/cased_L-12_H-768_A-12/bert_config.json',
-            checkpoint_file='resource/cased_L-12_H-768_A-12/bert_model.ckpt',
-            seq_len=max_sequence_length,
-            trainable=trainable,
-            num_hidden_layers=None
-        )
-        # This BERT implementation supports zero-masking, and outputs masks as normal keras Embedding layer
-        # TODO: drop the vectors for [CLS] and [SEP] for BERT
-    else:
-        raise NotImplementedError()
-
-    return layer
+def get_embdedding_layer(embedding_matrix, max_sequence_length, trainable):
+    return Embedding(
+        embedding_matrix.shape[0],
+        embedding_matrix.shape[1],
+        embeddings_initializer=Constant(embedding_matrix),
+        input_length=max_sequence_length,
+        trainable=trainable,
+        mask_zero=True
+    )
 
 
 def get_pooling_layer(name):
@@ -103,11 +87,10 @@ class Max(Layer):
         return output
 
 
-def S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features, with_last_f_f_layer=True):
+def S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, fine_tune_word_vectors, word_vectors, with_extra_features, with_last_f_f_layer=True):
     embdedding_layer = None
     if with_embdedding_layer:
         embdedding_layer = get_embdedding_layer(
-            name=word_vectors_name,
             embedding_matrix=word_vectors,
             max_sequence_length=input_shape[0],
             trainable=fine_tune_word_vectors

@@ -1,26 +1,14 @@
 import re
 import nltk
-import codecs
 from collections import defaultdict, OrderedDict
 from dataset.swda.swda import CorpusReader
-from BERT_tokenizer import FullTokenizer
 
-def load_swda_corpus(conversation_list, concatenate_interruption, BERT=False):
+def load_swda_corpus(conversation_list, concatenate_interruption):
     corpus = defaultdict(lambda: defaultdict(list))
     vocabulary = OrderedDict({'<TOKEN_PAD>': 0, '<PRE_CONTEXT_PAD>': 1, '<POST_CONTEXT_PAD>': 2, '<UNK>': 3, '<-->': 4})
     tag_set = set()
     speaker_set = set()
-
     tokenizer = nltk.tokenize.TweetTokenizer()
-    if BERT is True:
-        vocab_file = 'resource/cased_L-12_H-768_A-12/vocab.txt'
-        with codecs.open(vocab_file, 'r', 'utf8') as reader:
-            for line in reader:
-                token = line.strip()
-                if token in ['[PAD]', '[unused1]', '[unused2]', '[unused3]', '[unused4]']:
-                    continue
-                vocabulary[token] = len(vocabulary)
-        tokenizer = FullTokenizer(vocab_file, do_lower_case=False)
 
     for trans in CorpusReader('dataset/swda/swda').iter_transcripts():
         conversation_id = 'sw' + str(trans.conversation_no)
@@ -40,6 +28,7 @@ def load_swda_corpus(conversation_list, concatenate_interruption, BERT=False):
                 if output == words:
                     break
                 words = output
+            # print(words)
             words = tokenizer.tokenize(words)
             words = ' '.join(words)
             words = re.sub(r' -s', 's', words)

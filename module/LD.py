@@ -54,7 +54,7 @@ def LD(context_size, history_sizes, input_shape, recurrent_name, pooling_name, n
             for _ in range(context_size)
         ]
 
-    s2v = S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, word_vectors_name, fine_tune_word_vectors, word_vectors, with_extra_features, with_last_f_f_layer=False)
+    s2v = S2V(input_shape, recurrent_name, pooling_name, n_hidden, dropout_rate, path_to_results, is_base_network, with_embdedding_layer, fine_tune_word_vectors, word_vectors, with_extra_features, with_last_f_f_layer=False)
 
     outpus_queue = [[
         s2v(inputs[i])

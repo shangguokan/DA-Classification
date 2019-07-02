@@ -3,8 +3,6 @@ import json
 import numpy as np
 from gensim.models import Word2Vec
 
-import keras_bert
-import keras_transformer
 import tensorflow as tf
 from keras.models import load_model
 from sklearn.decomposition import PCA
@@ -97,12 +95,6 @@ def load_keras_model(path):
             'AttentionWithVec': AttentionWithVec,
             'AttentionWithContext': AttentionWithContext,
             'AttentionWithTimeDecay': AttentionWithTimeDecay,
-            'TokenEmbedding': keras_bert.bert.TokenEmbedding,
-            'PositionEmbedding': keras_bert.bert.PositionEmbedding,
-            'LayerNormalization': keras_bert.bert.LayerNormalization,
-            'gelu': keras_bert.bert.gelu,
-            'MultiHeadAttention': keras_transformer.transformer.MultiHeadAttention,
-            'FeedForward': keras_transformer.transformer.FeedForward,
             'Sum': Sum,
             'Max': Max,
             'ConcatenateFeatures': ConcatenateFeatures,
