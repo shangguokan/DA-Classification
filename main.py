@@ -5,19 +5,28 @@ import model
 import numpy as np
 from datetime import datetime
 from dataset.swda_split import *
-from dataset.loader import load_swda_corpus
+from collections import OrderedDict
+from dataset.loader import load_swda_corpus, tokenize_corpus
 from sklearn.preprocessing import LabelBinarizer
 from keras.preprocessing.sequence import pad_sequences
 
-conversation_list = train_set_idx + valid_set_idx + test_set_idx
-corpus, vocabulary, tag_set, speaker_set = load_swda_corpus(conversation_list, concatenate_interruption=True)
-
 wv_dim = 64
-sentences = [sent for cid in train_set_idx + valid_set_idx for sent in corpus[cid]['text']]
-utlis.train_and_save_word2vec(sentences, wv_dim=wv_dim, path='resource/wv_swda.bin')
+vocab_size = 5000
 
-word_vectors = utlis.load_word2vec('resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, PCA_dim=64)
-# word_vectors = utlis.load_word2vec('resource/GoogleNews-vectors-negative300-SLIM.bin.gz', vocabulary, wv_dim=300, PCA_dim=64)
+conversation_list = train_set_idx + valid_set_idx + test_set_idx
+corpus, tag_set, speaker_set = load_swda_corpus(conversation_list, concatenate_interruption=True, do_lowercase=True)
+
+sentences = [sent for cid in train_set_idx + valid_set_idx for sent in corpus[cid]['text']]
+utlis.train_and_save_tokenizer(sentences, vocab_size=vocab_size, type='unigram')
+tokenizer = utlis.load_tokenizer('resource/tokenizer.model')
+vocabulary = OrderedDict([(tokenizer.id_to_piece(id), id) for id in range(tokenizer.get_piece_size())])
+
+corpus = tokenize_corpus(corpus, tokenizer)
+
+sentences = [sent for cid in train_set_idx + valid_set_idx for sent in corpus[cid]['tokenized_text']]
+utlis.train_and_save_word2vec(sentences, wv_dim=wv_dim, path='resource/wv_swda.bin')
+word_vectors = utlis.load_word2vec('resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, pca_dim=64)
+# word_vectors = utlis.load_word2vec('resource/GoogleNews-vectors-negative300-SLIM.bin.gz', vocabulary, wv_dim=300, pca_dim=64)
 
 pre_context_size = 3
 post_context_size = 3

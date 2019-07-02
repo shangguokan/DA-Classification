@@ -1,9 +1,9 @@
 import os
 import json
 import numpy as np
-from gensim.models import Word2Vec
-
 import tensorflow as tf
+import sentencepiece as spm
+from gensim.models import Word2Vec
 from keras.models import load_model
 from sklearn.decomposition import PCA
 from module.LD import Bias
@@ -23,7 +23,35 @@ if os.environ.get('DISPLAY', '') == '':
 import matplotlib.pyplot as plt
 
 
-def load_word2vec(path, vocabulary, wv_dim, PCA_dim):
+def train_and_save_tokenizer(sentences, vocab_size, type='unigram', user_defined_symbols='<PRE_CONTEXT_PAD>,<POST_CONTEXT_PAD>,<CONNECTOR>', path='resource/tokenizer.model'):
+    with open('resource/sentences.txt', 'w') as f:
+        for sentence in sentences:
+            f.write(' '.join(sentence)+'\n')
+
+    spm.SentencePieceTrainer.train(
+        '--input=resource/sentences.txt --bos_id=-1 --eos_id=-1 --pad_id=0 --unk_id=1 --pad_piece=<PAD> --unk_piece=<UNK>' +
+        ' --user_defined_symbols='+user_defined_symbols +
+        ' --vocab_size='+str(vocab_size) +
+        ' --model_type='+type +
+        ' --model_prefix='+path.split('.')[0]
+    )
+
+
+def load_tokenizer(path='resource/tokenizer.model'):
+    sp = spm.SentencePieceProcessor()
+    sp.load(path)
+    return sp
+
+
+def train_and_save_word2vec(sentences, wv_dim, path):
+    model = Word2Vec(size=wv_dim, min_count=1)
+    model.build_vocab(sentences)
+
+    model.train(sentences, total_examples=len(sentences), epochs=30)
+    model.wv.save_word2vec_format(path, binary=True)
+
+
+def load_word2vec(path, vocabulary, wv_dim, pca_dim):
     vocabulary = list(vocabulary.keys())
     model = Word2Vec(size=wv_dim, min_count=1)
     model.build_vocab_from_freq(dict.fromkeys(vocabulary, 1))
@@ -39,19 +67,11 @@ def load_word2vec(path, vocabulary, wv_dim, PCA_dim):
     for index, word in enumerate(vocabulary):
         embeddings[index] = model.wv[word]
 
-    if PCA_dim < wv_dim:
-        embeddings = PCA(n_components=PCA_dim).fit_transform(embeddings)
+    if pca_dim < wv_dim:
+        embeddings = PCA(n_components=pca_dim).fit_transform(embeddings)
 
     embeddings[0] = 0
     return embeddings
-
-
-def train_and_save_word2vec(sentences, wv_dim, path):
-    model = Word2Vec(size=wv_dim, min_count=1)
-    model.build_vocab(sentences)
-
-    model.train(sentences, total_examples=len(sentences), epochs=30)
-    model.wv.save_word2vec_format(path, binary=True)
 
 
 def flatten(list_of_list):
