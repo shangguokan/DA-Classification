@@ -43,9 +43,9 @@ def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, 
 
 
 def load_tokenizer(path='resource/tokenizer.model'):
-    sp = spm.SentencePieceProcessor()
-    sp.load(path)
-    return sp
+    model = spm.SentencePieceProcessor()
+    model.load(path)
+    return model
 
 
 def train_and_save_word2vec(sentences, wv_dim, path):
