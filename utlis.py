@@ -14,6 +14,7 @@ from module.TIXIER import Sum
 from module.TIXIER import ConcatenateFeatures
 from module.TIXIER import ConcatenateContexts
 from module.S2V import Max
+from nltk.tokenize import word_tokenize
 
 import matplotlib
 if os.environ.get('DISPLAY', '') == '':
@@ -23,17 +24,18 @@ if os.environ.get('DISPLAY', '') == '':
 import matplotlib.pyplot as plt
 
 
-def train_and_save_tokenizer(sentences, vocab_size, type='unigram', user_defined_symbols='<PRE_CONTEXT_PAD>,<POST_CONTEXT_PAD>,<CONNECTOR>', path='resource/tokenizer.model'):
+def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path):
     with open('resource/sentences.txt', 'w') as f:
         for sentence in sentences:
-            f.write(' '.join(sentence)+'\n')
+            f.write(sentence + '\n')
 
     spm.SentencePieceTrainer.train(
-        '--input=resource/sentences.txt --bos_id=-1 --eos_id=-1 --pad_id=0 --unk_id=1 --pad_piece=<PAD> --unk_piece=<UNK>' +
+        '--input=resource/sentences.txt --character_coverage=1.0 --bos_id=-1 --eos_id=-1 --pad_id=0 --unk_id=1 --pad_piece=<PAD> --unk_piece=<UNK>' +
         ' --user_defined_symbols='+user_defined_symbols +
         ' --vocab_size='+str(vocab_size) +
         ' --model_type='+type +
-        ' --model_prefix='+path.split('.')[0]
+        ' --model_prefix='+path.split('.')[0] +
+        ' --split_by_whitespace='+str(split_by_whitespace).lower()
     )
 
 

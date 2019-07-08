@@ -11,15 +11,30 @@ from sklearn.preprocessing import LabelBinarizer
 from keras.preprocessing.sequence import pad_sequences
 
 wv_dim = 64
-vocab_size = 5000
+vocab_size = 10000
 
 conversation_list = train_set_idx + valid_set_idx + test_set_idx
-corpus, tag_set, speaker_set = load_swda_corpus(conversation_list, concatenate_interruption=True, do_lowercase=True)
+corpus, tag_set, speaker_set, user_defined_symbols = load_swda_corpus(
+    conversation_list,
+    concatenate_interruption=True,
+    do_lowercase=True,
+    do_pretokenization=True,  # The input sentence must be pretokenized when using "word" type.
+    strip_punctuation=False
+)
 
 sentences = [sent for cid in train_set_idx + valid_set_idx for sent in corpus[cid]['text']]
-utlis.train_and_save_tokenizer(sentences, vocab_size=vocab_size, type='unigram')
+utlis.train_and_save_tokenizer(
+    sentences,
+    vocab_size=vocab_size,
+    type='word',
+    user_defined_symbols='▁'+',▁'.join(list(user_defined_symbols)),
+    split_by_whitespace=True,
+    path='resource/tokenizer.model'
+)
 tokenizer = utlis.load_tokenizer('resource/tokenizer.model')
 vocabulary = OrderedDict([(tokenizer.id_to_piece(id), id) for id in range(tokenizer.get_piece_size())])
+vocabulary['<PRE_CONTEXT_PAD>'] = len(vocabulary)
+vocabulary['<POST_CONTEXT_PAD>'] = len(vocabulary)
 
 corpus = tokenize_corpus(corpus, tokenizer)
 
