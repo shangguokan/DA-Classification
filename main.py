@@ -11,14 +11,14 @@ from sklearn.preprocessing import LabelBinarizer
 from keras.preprocessing.sequence import pad_sequences
 
 wv_dim = 64
-vocab_size = 10000
+vocab_size = 10000  # for "unigram" and "bpe" tokenization type
 
 conversation_list = train_set_idx + valid_set_idx + test_set_idx
 corpus, tag_set, speaker_set, user_defined_symbols = load_swda_corpus(
     conversation_list,
     concatenate_interruption=True,
     do_lowercase=True,
-    do_pretokenization=True,  # The input sentence must be pretokenized when using "word" type.
+    do_pretokenization=True,  # The input must be pretokenized when using "word" tokenization type.
     strip_punctuation=False
 )
 

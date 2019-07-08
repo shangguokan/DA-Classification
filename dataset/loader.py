@@ -53,7 +53,7 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
             # print(words)
 
             # irregular annotations
-            for s in irregular_string:
+            for s in irregular_strings:
                 words = re.sub(s, '', words)
             words = re.sub('<Laughter.>', '<Laughter>', words)
             words = re.sub('<Talking.>', '<Talking>', words)
@@ -103,7 +103,7 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
     return corpus, tag_set, speaker_set, user_defined_symbols
 
 
-irregular_string = [
+irregular_strings = [
     "< another example like I guess it's alzheimer's >",
     '< do you think this could possibly be prohibit\? nothing elseseems to make any sense\?\? >',
     '< like as verb of saying! >',

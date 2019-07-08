@@ -29,13 +29,16 @@ def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, 
         for sentence in sentences:
             f.write(sentence + '\n')
 
+    type_is_word = True if type == 'word' else False
+
     spm.SentencePieceTrainer.train(
         '--input=resource/sentences.txt --character_coverage=1.0 --bos_id=-1 --eos_id=-1 --pad_id=0 --unk_id=1 --pad_piece=<PAD> --unk_piece=<UNK>' +
         ' --user_defined_symbols='+user_defined_symbols +
         ' --vocab_size='+str(vocab_size) +
         ' --model_type='+type +
         ' --model_prefix='+path.split('.')[0] +
-        ' --split_by_whitespace='+str(split_by_whitespace).lower()
+        ' --split_by_whitespace='+str(split_by_whitespace).lower() +
+        ' --use_all_vocab='+str(type_is_word).lower()  # https://github.com/google/sentencepiece/issues/200
     )
 
 
