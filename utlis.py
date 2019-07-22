@@ -14,7 +14,6 @@ from module.TIXIER import Sum
 from module.TIXIER import ConcatenateFeatures
 from module.TIXIER import ConcatenateContexts
 from module.S2V import Max
-from nltk.tokenize import word_tokenize
 
 import matplotlib
 if os.environ.get('DISPLAY', '') == '':
@@ -48,11 +47,11 @@ def load_tokenizer(path='resource/tokenizer.model'):
     return model
 
 
-def train_and_save_word2vec(sentences, wv_dim, path):
+def train_and_save_word2vec(sentences, wv_dim, epochs, path):
     model = Word2Vec(size=wv_dim, min_count=1)
     model.build_vocab(sentences)
 
-    model.train(sentences, total_examples=len(sentences), epochs=30)
+    model.train(sentences, total_examples=len(sentences), epochs=epochs)
     model.wv.save_word2vec_format(path, binary=True)
 
 

@@ -1,15 +1,17 @@
 import os
 import utlis
 import datetime
+import keras.backend as K
 from time import time
 from keras.models import Model
-from keras.layers import Input, Dense
+from keras.layers import Input, Dense, concatenate, Lambda, GRU
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 from module.S2V import S2V
 from module.HAN import HAN
 from module.LD import LD
 from module.TIXIER import TIXIER
+
 
 def train(wv_dim, fine_tune_word_vectors,
     with_extra_features, module_name,
@@ -113,11 +115,23 @@ def train(wv_dim, fine_tune_word_vectors,
             fine_tune_word_vectors=fine_tune_word_vectors,
             word_vectors=word_vectors,
 
-            with_extra_features=with_extra_features,
+            with_extra_features=False,
             with_last_f_f_layer=False
         )
 
-    model = Model(inputs, Dense(units=42, activation='softmax')(module(inputs)))
+    stack_layer = Lambda(K.stack, arguments={'axis': 1})
+    gru_layer = GRU(
+        units=n_hidden,
+        activation='tanh',
+        return_sequences=False
+    )
+
+    t1 = concatenate([module(inputs[0]), inputs[1]])
+    t2 = concatenate([module(inputs[2]), inputs[3]])
+    t3 = concatenate([module(inputs[4]), inputs[5]])
+    t4 = concatenate([module(inputs[6]), inputs[7]])
+
+    model = Model(inputs, Dense(units=42, activation='softmax')(gru_layer(stack_layer([t1, t2, t3, t4]))))
 
     from keras.utils import plot_model
     plot_model(model, show_shapes=True, to_file=path_to_results+'model.png')

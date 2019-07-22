@@ -1,5 +1,7 @@
+import os
 import re
 import string
+from numpy import loadtxt
 from collections import defaultdict
 from dataset.swda.swda import CorpusReader
 
@@ -22,6 +24,47 @@ def tokenize_corpus(corpus, tokenizer):
         corpus[cid]['sequence'] = sequences
 
     return corpus
+
+
+def load_mrda_corpus(conversation_list, tag_map, strip_punctuation, do_pretokenization):
+    # tag_map: {basic, general, full}, see "Data Format" https://github.com/NathanDuran/MRDA-Corpus
+    corpus = defaultdict(lambda: defaultdict(list))
+    tag_set = set()
+    speaker_set = set()
+    user_defined_symbols = set()
+
+    for conversation_id in conversation_list:
+        for path in ['dataset/MRDA-Corpus/mrda_data/' + folder + '/' + conversation_id + '.txt' for folder in ['train', 'dev', 'eval', 'test']]:
+            if os.path.isfile(path):
+                trans = loadtxt(path, delimiter='|', dtype=str)
+                col_0, col_1, col_2, col_3, col_4 = (list(trans[:, i]) for i in range(5))
+
+                corpus[conversation_id]['speaker'] = col_0
+
+                corpus[conversation_id]['text'] = col_1
+                if strip_punctuation is True:
+                    corpus[conversation_id]['text'] = [
+                        words.translate(str.maketrans('', '', '.,?!":'))
+                        for words in corpus[conversation_id]['text']
+                    ]
+                if do_pretokenization is True:
+                    corpus[conversation_id]['text'] = [
+                        ' '.join(re.sub(r'([.,?!":])', ' \\1 ', words).split())
+                        for words in corpus[conversation_id]['text']
+                    ]
+
+                if tag_map == 'basic':
+                    tag_list = col_2
+                if tag_map == 'general':
+                    tag_list = col_3
+                if tag_map == 'full':
+                    tag_list = col_4
+                corpus[conversation_id]['tag'] = tag_list
+
+                tag_set = tag_set.union(set(tag_list))
+                speaker_set = speaker_set.union(set(col_0))
+
+    return corpus, tag_set, speaker_set, user_defined_symbols
 
 
 def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, strip_punctuation, do_pretokenization):
@@ -53,7 +96,7 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
             # print(words)
 
             # irregular annotations
-            for s in irregular_strings:
+            for s in swda_irregular_annotation_strings:
                 words = re.sub(s, '', words)
             words = re.sub('<Laughter.>', '<Laughter>', words)
             words = re.sub('<Talking.>', '<Talking>', words)
@@ -71,15 +114,15 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
             if do_pretokenization is True:
                 words = re.sub(r'([.,?!":])', ' \\1 ', words)
 
+            if strip_punctuation is True:
+                words = words.translate(str.maketrans('', '', '.,?!":'))
+
             words = words.split()
             if len(words) == 0:
                 words = ['<non_verbal>'] + words
             if len(words) == 1 and words[0] in '.,?!":':
                 words = ['<non_verbal>'] + words
             words = ' '.join(words)
-
-            if strip_punctuation is True:
-                words = words.translate(str.maketrans('', '', '.,?!":'))
 
             user_defined_symbols.update(re.findall("<[^>]*>", words))
 
@@ -103,7 +146,7 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
     return corpus, tag_set, speaker_set, user_defined_symbols
 
 
-irregular_strings = [
+swda_irregular_annotation_strings = [
     "< another example like I guess it's alzheimer's >",
     '< do you think this could possibly be prohibit\? nothing elseseems to make any sense\?\? >',
     '< like as verb of saying! >',

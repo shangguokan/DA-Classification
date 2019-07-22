@@ -1,3 +1,7 @@
 [submodule "dataset/swda"]
 	path = dataset/swda
 	url = https://github.com/cgpotts/swda.git
+
+[submodule "dataset/MRDA-Corpus"]
+	path = dataset/MRDA-Corpus
+	url = https://github.com/NathanDuran/MRDA-Corpus.git
