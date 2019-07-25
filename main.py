@@ -68,12 +68,12 @@ mrda_train_val_tokenized_sentences = [
     for sentence in mrda_corpus[conversation_id]['tokenized_sentence']
 ]
 tokenized_sentences = swda_train_val_tokenized_sentences + mrda_train_val_tokenized_sentences
-# utlis.train_and_save_word2vec(
-#     tokenized_sentences,
-#     wv_dim=wv_dim,
-#     wv_epochs=wv_epochs,
-#     path='resource/wv_swda.bin'
-# )
+utlis.train_and_save_word2vec(
+    tokenized_sentences,
+    wv_dim=wv_dim,
+    wv_epochs=wv_epochs,
+    path='resource/wv_swda.bin'
+)
 word_vectors = utlis.load_word2vec('resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim)
 
 ####################################################
@@ -88,7 +88,7 @@ pre_context_size = 3
 post_context_size = 2
 seq_lens = [len(seq) for cid in conversation_list for seq in corpus[cid]['sequence']]
 print('max_seq_len', max(seq_lens))
-max_seq_len = 10
+max_seq_len = 50
 padding = 'post'
 truncating = 'post'
 
@@ -182,6 +182,7 @@ y_true = [tag for i, tag in enumerate(y_true) if i not in pad_idxs]
 y_pred = [tag for i, tag in enumerate(y_pred) if i not in pad_idxs]
 final_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
 
+print(final_accuracy)
 with open(path_to_results + 'result.json', 'w') as f:
     f.write(json.dumps(
         dict(((k, eval(k)) for k in ('wv_dim', 'vocab_size', 'tokenization_type', 'pre_context_size', 'post_context_size', 'best_epoch', 'val_loss', 'val_accuracy', 'test_loss', 'test_accuracy', 'final_accuracy')))
