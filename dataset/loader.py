@@ -6,52 +6,44 @@ from collections import defaultdict
 from dataset.swda.swda import CorpusReader
 
 
-def tokenize_corpus(corpus, tokenizer):
-    for cid in corpus.keys():
-        tokenized_sentences = []
-        sequences = []
-        for sentence in corpus[cid]['text']:
-            print(sentence)
-            tokenized_sentences.append(
-                tokenizer.encode_as_pieces(sentence)
-            )
-            print(tokenizer.encode_as_pieces(sentence))
-            sequences.append(
-                tokenizer.encode_as_ids(sentence)
-            )
-            print(tokenizer.encode_as_ids(sentence))
-        corpus[cid]['tokenized_text'] = tokenized_sentences
-        corpus[cid]['sequence'] = sequences
-
-    return corpus
-
-
-def load_mrda_corpus(conversation_list, tag_map, strip_punctuation, do_pretokenization):
-    # tag_map: {basic, general, full}, see "Data Format" https://github.com/NathanDuran/MRDA-Corpus
+def load_mrda_corpus(conversation_list,
+                     strip_punctuation,
+                     tokenize_punctuation,
+                     tag_map='basic'):
+    """ Load MRDA corpus based on https://github.com/NathanDuran/MRDA-Corpus
+    :param conversation_list:
+    :param strip_punctuation:
+    :param tokenize_punctuation:
+    :param tag_map: basic, general, full.
+    :return:
+    """
     corpus = defaultdict(lambda: defaultdict(list))
     tag_set = set()
     speaker_set = set()
-    user_defined_symbols = set()
+    symbol_set = set()
 
     for conversation_id in conversation_list:
-        for path in ['dataset/MRDA-Corpus/mrda_data/' + folder + '/' + conversation_id + '.txt' for folder in ['train', 'dev', 'eval', 'test']]:
+        for path in ['dataset/MRDA-Corpus/mrda_data/'+folder+'/'+conversation_id+'.txt'
+                     for folder in ['train', 'dev', 'eval', 'test']]:
             if os.path.isfile(path):
                 trans = loadtxt(path, delimiter='|', dtype=str)
                 col_0, col_1, col_2, col_3, col_4 = (list(trans[:, i]) for i in range(5))
 
                 corpus[conversation_id]['speaker'] = col_0
+                speaker_set.update(set(col_0))
 
-                corpus[conversation_id]['text'] = col_1
+                sentence_list = col_1
                 if strip_punctuation is True:
-                    corpus[conversation_id]['text'] = [
-                        words.translate(str.maketrans('', '', '.,?!":'))
-                        for words in corpus[conversation_id]['text']
+                    sentence_list = [
+                        sentence.translate(str.maketrans('', '', '.,?!":'))
+                        for sentence in sentence_list
                     ]
-                if do_pretokenization is True:
-                    corpus[conversation_id]['text'] = [
-                        ' '.join(re.sub(r'([.,?!":])', ' \\1 ', words).split())
-                        for words in corpus[conversation_id]['text']
+                if tokenize_punctuation is True:
+                    sentence_list = [
+                        ' '.join(re.sub(r'([.,?!":])', ' \\1 ', sentence).split(' '))
+                        for sentence in sentence_list
                     ]
+                corpus[conversation_id]['sentence'] = sentence_list
 
                 if tag_map == 'basic':
                     tag_list = col_2
@@ -60,19 +52,31 @@ def load_mrda_corpus(conversation_list, tag_map, strip_punctuation, do_pretokeni
                 if tag_map == 'full':
                     tag_list = col_4
                 corpus[conversation_id]['tag'] = tag_list
+                tag_set.update(set(tag_list))
 
-                tag_set = tag_set.union(set(tag_list))
-                speaker_set = speaker_set.union(set(col_0))
+                break
 
-    return corpus, tag_set, speaker_set, user_defined_symbols
+    return corpus, tag_set, speaker_set, symbol_set
 
 
-def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, strip_punctuation, do_pretokenization):
+def load_swda_corpus(conversation_list,
+                     strip_punctuation,
+                     tokenize_punctuation,
+                     concatenate_interruption=True,
+                     do_lowercase=True):
+    """ Load SwDA corpus based on https://github.com/cgpotts/swda
+    :param conversation_list:
+    :param strip_punctuation:
+    :param tokenize_punctuation:
+    :param concatenate_interruption:
+    :param do_lowercase:
+    :return:
+    """
     corpus = defaultdict(lambda: defaultdict(list))
     tag_set = set()
     speaker_set = set()
-    user_defined_symbols = set()
-    user_defined_symbols.add('<CONNECTOR>')
+    symbol_set = set()
+    symbol_set.add('<CONNECTOR>')
 
     for trans in CorpusReader('dataset/swda/swda').iter_transcripts():
         conversation_id = 'sw' + str(trans.conversation_no)
@@ -80,55 +84,52 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
             continue
 
         for utt in trans.utterances:
-            words = ' '.join(utt.text_words(filter_disfluency=True))
-            words = ''.join(filter(lambda x: x in string.printable, words))
-            # print(words)
-            words = re.sub(r'<<[^>]*>>', '', words)
-            words = re.sub(r'\*.*$', '', words)
-            words = re.sub(r'[#)(]', '', words)
-            words = re.sub(r'--', '', words)
-            words = re.sub(r' -$', '', words)
+            sentence = ' '.join(utt.text_words(filter_disfluency=True))
+            sentence = re.sub(r'<<[^>]*>>', '', sentence)
+            sentence = re.sub(r'\*.*$', '', sentence)
+            sentence = re.sub(r'[#)(]', '', sentence)
+            sentence = re.sub(r'--', '', sentence)
+            sentence = re.sub(r' -$', '', sentence)
             while True:
-                output = re.sub(r'([A-Z]) ([A-Z])\b', '\\1\\2', words)
-                if output == words:
+                output = re.sub(r'([A-Z]) ([A-Z])\b', '\\1\\2', sentence)
+                if output == sentence:
                     break
-                words = output
-            # print(words)
+                sentence = output
 
             # irregular annotations
-            for s in swda_irregular_annotation_strings:
-                words = re.sub(s, '', words)
-            words = re.sub('<Laughter.>', '<Laughter>', words)
-            words = re.sub('<Talking.>', '<Talking>', words)
-            words = re.sub('<Children _talking>', '<Children_talking>', words)
-            words = re.sub('<baby crying>', '<baby_crying>', words)
-            words = re.sub('<child squealing>', '<child_squealing>', words)
-            words = re.sub('<child-talking>', '<child_talking>', words)
-            words = re.sub('<clicks on telephone>', '<clicks_on_telephone>', words)
-            words = re.sub('<hiss or static>', '<hiss_or_static>', words)
-            words = re.sub('<more laughing>', '<more_laughing>', words)
+            for irr_str in swda_irregular_annotation_strings:
+                sentence = re.sub(irr_str, '', sentence)
+            sentence = re.sub('<Laughter.>', '<Laughter>', sentence)
+            sentence = re.sub('<Talking.>', '<Talking>', sentence)
+            sentence = re.sub('<Children _talking>', '<Children_talking>', sentence)
+            sentence = re.sub('<baby crying>', '<baby_crying>', sentence)
+            sentence = re.sub('<child squealing>', '<child_squealing>', sentence)
+            sentence = re.sub('<child-talking>', '<child_talking>', sentence)
+            sentence = re.sub('<clicks on telephone>', '<clicks_on_telephone>', sentence)
+            sentence = re.sub('<hiss or static>', '<hiss_or_static>', sentence)
+            sentence = re.sub('<more laughing>', '<more_laughing>', sentence)
 
             if do_lowercase is True:
-                words = words.lower()
-
-            if do_pretokenization is True:
-                words = re.sub(r'([.,?!":])', ' \\1 ', words)
+                sentence = sentence.lower()
 
             if strip_punctuation is True:
-                words = words.translate(str.maketrans('', '', '.,?!":'))
+                sentence = sentence.translate(str.maketrans('', '', '.,?!":'))
 
-            words = words.split()
-            if len(words) == 0:
-                words = ['<non_verbal>'] + words
-            if len(words) == 1 and words[0] in '.,?!":':
-                words = ['<non_verbal>'] + words
-            words = ' '.join(words)
+            if tokenize_punctuation is True:
+                sentence = re.sub(r'([.,?!":])', ' \\1 ', sentence)
 
-            user_defined_symbols.update(re.findall("<[^>]*>", words))
+            sentence = sentence.split()
+            if len(sentence) == 0:
+                sentence = ['<non_verbal>']
+            if len(sentence) == 1 and sentence[0] in '.,?!":':
+                sentence = ['<non_verbal>'] + sentence
+            sentence = ' '.join(sentence)
+
+            symbol_set.update(re.findall("<[^>]*>", sentence))
 
             utt_tag = utt.damsl_act_tag()
             if (utt_tag != '+') or (utt_tag == '+' and concatenate_interruption is False):
-                corpus[conversation_id]['text'].append(words)
+                corpus[conversation_id]['sentence'].append(sentence)
                 corpus[conversation_id]['tag'].append(utt_tag)
                 corpus[conversation_id]['speaker'].append(utt.caller)
                 tag_set.add(utt_tag)
@@ -138,12 +139,12 @@ def load_swda_corpus(conversation_list, concatenate_interruption, do_lowercase, 
                 concatenated = False
                 for i in reversed(range(len(corpus[conversation_id]['tag']))):
                     if corpus[conversation_id]['speaker'][i] == utt.caller:
-                        corpus[conversation_id]['text'][i] += ' <CONNECTOR> '+words
+                        corpus[conversation_id]['sentence'][i] += ' <CONNECTOR> '+sentence
                         concatenated = True
                         break
-                assert concatenated is True, 'please comment out the line #195 of swda/swda.py.'
+                assert concatenated is True, 'please comment out the line #195 of dataset/swda/swda.py.'
 
-    return corpus, tag_set, speaker_set, user_defined_symbols
+    return corpus, tag_set, speaker_set, symbol_set
 
 
 swda_irregular_annotation_strings = [

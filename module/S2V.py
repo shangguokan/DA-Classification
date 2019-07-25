@@ -1,9 +1,3 @@
-"""
-https://stackoverflow.com/questions/47485216/how-does-mask-zero-in-keras-embedding-layer-work
-https://stackoverflow.com/questions/49670832/keras-lstm-with-masking-layer-for-variable-length-inputs
-https://stackoverflow.com/questions/51720236/multi-feature-sequence-padding-and-masking-in-rnn-using-keras
-https://stackoverflow.com/questions/47057361/keras-using-tensorflow-backend-masking-on-loss-function
-"""
 import tensorflow as tf
 import keras.backend as K
 from keras.models import Model
@@ -40,20 +34,21 @@ def get_pooling_layer(name):
 
 
 def get_recurrent_layer(name, n_hidden, return_sequences):
+    layer = None
+
     if name.endswith('LSTM'):
         layer = LSTM(
             units=n_hidden,
             activation='tanh',
             return_sequences=return_sequences
         )
-    elif name.endswith('GRU'):
+
+    if name.endswith('GRU'):
         layer = GRU(
             units=n_hidden,
             activation='tanh',
             return_sequences=return_sequences
         )
-    else:
-        raise NotImplementedError()
 
     if name.startswith('Bi'):
         # mode is one of {'sum', 'mul', 'concat', 'ave', None}

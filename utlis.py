@@ -6,7 +6,6 @@ import sentencepiece as spm
 from gensim.models import Word2Vec
 from keras.models import load_model
 from sklearn.decomposition import PCA
-from module.LD import Bias
 from module.attention_with_vec import AttentionWithVec
 from module.attention_with_context import AttentionWithContext
 from module.attention_with_time_decay import AttentionWithTimeDecay
@@ -21,6 +20,10 @@ if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+from keras_contrib.layers import CRF
+from keras_contrib.losses import crf_loss
+from keras_contrib.metrics import crf_viterbi_accuracy
 
 
 def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path):
@@ -44,14 +47,33 @@ def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, 
 def load_tokenizer(path='resource/tokenizer.model'):
     model = spm.SentencePieceProcessor()
     model.load(path)
+
     return model
 
 
-def train_and_save_word2vec(sentences, wv_dim, epochs, path):
-    model = Word2Vec(size=wv_dim, min_count=1)
-    model.build_vocab(sentences)
+def tokenize_corpus(corpus, tokenizer):
+    for cid in corpus.keys():
+        corpus[cid]['tokenized_sentence'] = [
+            tokenizer.encode_as_pieces(sentence)
+            for sentence in corpus[cid]['sentence']
+        ]
+        corpus[cid]['sequence'] = [
+            tokenizer.encode_as_ids(sentence)
+            for sentence in corpus[cid]['sentence']
+        ]
 
-    model.train(sentences, total_examples=len(sentences), epochs=epochs)
+    return corpus
+
+
+def train_and_save_word2vec(tokenized_sentences, wv_dim, wv_epochs, path):
+    with open('resource/tokenized_sentences.txt', 'w') as f:
+        for tokenized_sentence in tokenized_sentences:
+            f.write(' '.join(tokenized_sentence) + '\n')
+
+    model = Word2Vec(size=wv_dim, min_count=1)
+    model.build_vocab(tokenized_sentences)
+
+    model.train(tokenized_sentences, total_examples=len(tokenized_sentences), epochs=wv_epochs)
     model.wv.save_word2vec_format(path, binary=True)
 
 
@@ -65,7 +87,7 @@ def load_word2vec(path, vocabulary, wv_dim, pca_dim):
     # Words without an entry in the binary file are silently initialized to random values.
     # We can detect those vectors via their norms which approach zero.
     words_zero_norm = [word for word in model.wv.vocab if np.linalg.norm(model.wv[word]) < 0.05]
-    print(' - OOV words: %d / %d' % (len(words_zero_norm), len(vocabulary) - 1), words_zero_norm[:50])
+    print(' - words not trained: %d / %d' % (len(words_zero_norm), len(vocabulary) - 1), words_zero_norm)
 
     embeddings = np.zeros((len(vocabulary), wv_dim))
     for index, word in enumerate(vocabulary):
@@ -73,8 +95,8 @@ def load_word2vec(path, vocabulary, wv_dim, pca_dim):
 
     if pca_dim < wv_dim:
         embeddings = PCA(n_components=pca_dim).fit_transform(embeddings)
-
     embeddings[0] = 0
+
     return embeddings
 
 
@@ -115,13 +137,15 @@ def load_keras_model(path):
         path,
         custom_objects={
             'tf': tf,
-            'Bias': Bias,
             'AttentionWithVec': AttentionWithVec,
             'AttentionWithContext': AttentionWithContext,
             'AttentionWithTimeDecay': AttentionWithTimeDecay,
             'Sum': Sum,
             'Max': Max,
             'ConcatenateFeatures': ConcatenateFeatures,
-            'ConcatenateContexts': ConcatenateContexts
+            'ConcatenateContexts': ConcatenateContexts,
+            'CRF': CRF,
+            'crf_loss': crf_loss,
+            'crf_viterbi_accuracy': crf_viterbi_accuracy
         }
     )
