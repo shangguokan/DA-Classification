@@ -87,7 +87,7 @@ maxlen = max(seq_lens)
 tag_lb = LabelBinarizer().fit(list(tag_set))
 spk_le = LabelEncoder().fit(list(speaker_set))
 for cid in conversation_list:
-    corpus[cid]['sequence'] = pad_sequences(corpus[cid]['sequence'], maxlen=10, padding='post', truncating='post')
+    corpus[cid]['sequence'] = pad_sequences(corpus[cid]['sequence'], maxlen=maxlen, padding='post', truncating='post')
     corpus[cid]['tag'] = tag_lb.transform(corpus[cid]['tag'])
     corpus[cid]['speaker'] = spk_le.transform(corpus[cid]['speaker'])
     corpus[cid]['speaker_change'] = np.not_equal(corpus[cid]['speaker'][:-1], corpus[cid]['speaker'][1:]).astype(int)
@@ -104,7 +104,7 @@ os.makedirs(path_to_results+'model_on_epoch_end')
 
 crf_type = ['our', 'vanilla'][0]
 batch_size = 1
-epochs = 3
+epochs = 50
 n_tags = len(tag_lb.classes_)
 history, model = training.train(X, Y, SPK_C, word_embedding_matrix, n_tags, epochs, batch_size, crf_type, path_to_results)
 utlis.save_and_plot_history(history, path_to_results)
@@ -117,8 +117,6 @@ val_loss, val_accuracy = val_loss_list[best_epoch-1], val_accuracy_list[best_epo
 
 print('the best epoch based on val_loss:', best_epoch)
 model.load_weights(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
-test_loss, test_accuracy = model.evaluate_generator(training.data_generator(X, Y, SPK_C, 'test', with_SPK_C=True, batch_size=batch_size), steps=len(X['test']))
-
 
 def viterbi_vanilla_crf(nodes, trans):
     paths = {(k,): v for k, v in nodes[0].items()}
@@ -149,6 +147,8 @@ def viterbi_our_crf(nodes, trans0, trans1, spk_change_sequence):
     return max(paths, key=paths.get)
 
 if crf_type == 'vanilla':
+    test_loss, test_accuracy = model.evaluate_generator(
+        training.data_generator(X, Y, SPK_C, 'test', with_SPK_C=False, batch_size=batch_size), steps=len(X['test']))
     trans = {}
 
     for i in range(n_tags):
@@ -169,6 +169,8 @@ if crf_type == 'vanilla':
 
     final_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
 elif crf_type == 'our':
+    test_loss, test_accuracy = model.evaluate_generator(
+        training.data_generator(X, Y, SPK_C, 'test', with_SPK_C=True, batch_size=batch_size), steps=len(X['test']))
     trans0, trans1 = {}, {}
 
     for i in range(n_tags):
@@ -194,5 +196,5 @@ print(final_accuracy)
 
 with open(path_to_results + 'result.json', 'w') as f:
     f.write(json.dumps(
-        dict(((k, eval(k)) for k in ('wv_dim', 'vocab_size', 'tokenization_type', 'best_epoch', 'val_loss', 'val_accuracy', 'test_loss', 'test_accuracy', 'final_accuracy')))
+        dict(((k, eval(k)) for k in ('crf_type', 'wv_dim', 'vocab_size', 'tokenization_type', 'best_epoch', 'val_loss', 'val_accuracy', 'test_loss', 'test_accuracy', 'final_accuracy')))
     ))
