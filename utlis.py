@@ -1,29 +1,15 @@
 import os
 import json
 import numpy as np
-import tensorflow as tf
 import sentencepiece as spm
 from gensim.models import Word2Vec
-from keras.models import load_model
 from sklearn.decomposition import PCA
-from module.attention_with_vec import AttentionWithVec
-from module.attention_with_context import AttentionWithContext
-from module.attention_with_time_decay import AttentionWithTimeDecay
-from module.TIXIER import Sum
-from module.TIXIER import ConcatenateFeatures
-from module.TIXIER import ConcatenateContexts
-from module.S2V import Max
-
 import matplotlib
 if os.environ.get('DISPLAY', '') == '':
     # https://matplotlib.org/faq/usage_faq.html#what-is-a-backend
     print('no display found. Using non-interactive Agg backend')
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
-from keras_contrib.layers import CRF
-from keras_contrib.losses import crf_loss
-from keras_contrib.metrics import crf_viterbi_accuracy
 
 
 def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path):
@@ -130,22 +116,3 @@ def save_and_plot_history(history, path_to_results):
 
 def load_history(path_to_results):
     return json.load(open(path_to_results + 'history.json'))
-
-
-def load_keras_model(path):
-    return load_model(
-        path,
-        custom_objects={
-            'tf': tf,
-            'AttentionWithVec': AttentionWithVec,
-            'AttentionWithContext': AttentionWithContext,
-            'AttentionWithTimeDecay': AttentionWithTimeDecay,
-            'Sum': Sum,
-            'Max': Max,
-            'ConcatenateFeatures': ConcatenateFeatures,
-            'ConcatenateContexts': ConcatenateContexts,
-            'CRF': CRF,
-            'crf_loss': crf_loss,
-            'crf_viterbi_accuracy': crf_viterbi_accuracy
-        }
-    )
