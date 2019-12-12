@@ -1,0 +1,175 @@
+from math import ceil
+import numpy as np
+from sklearn.utils import shuffle
+from keras.models import Model
+from keras.initializers import Constant
+from keras.layers import Input, Dense, Embedding, LSTM
+from keras.layers import TimeDistributed, Bidirectional, concatenate
+from keras.callbacks import ModelCheckpoint, EarlyStopping
+from vanilla_crf import VanillaCRF
+from our_crf import OurCRF
+
+
+def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
+    n_samples = len(X[set_name])
+    while True:
+        X[set_name], Y[set_name], SPK[set_name], SPK_C[set_name] = shuffle(X[set_name], Y[set_name], SPK[set_name], SPK_C[set_name])
+
+        B_X, B_Y, B_SPK, B_SPK_C = [], [], [], []
+
+        for i in range(n_samples):
+            B_X.append(X[set_name][i])
+            B_Y.append(Y[set_name][i])
+            B_SPK.append(SPK[set_name][i])
+            B_SPK_C.append(SPK_C[set_name][i])
+
+            if len(B_X) == batch_size or i == n_samples - 1:
+                if len(B_X) > 1:
+
+                    max_len = max([len(x) for x in B_X])
+                    for j in range(len(B_X)):
+                        current_len = len(B_X[j])
+                        if current_len < max_len:
+                            pad = np.zeros((max_len-current_len, B_X[j].shape[1]))
+                            pad[:, 0] = 1
+                            B_X[j] = np.vstack([B_X[j], pad])
+
+                    max_len = max([len(y) for y in B_Y])
+                    for j in range(len(B_Y)):
+                        current_len = len(B_Y[j])
+                        pad = np.zeros((current_len, 1))
+                        B_Y[j] = np.concatenate([B_Y[j], pad], axis=1)
+                        if current_len < max_len:
+                            pad = np.zeros((max_len-current_len, B_Y[j].shape[1]))
+                            pad[:, -1] = 1
+                            B_Y[j] = np.vstack([B_Y[j], pad])
+
+                    max_len = max([len(spk) for spk in B_SPK])
+                    for j in range(len(B_SPK)):
+                        current_len = len(B_SPK[j])
+                        if current_len < max_len:
+                            pad = np.zeros((max_len-current_len, B_SPK[j].shape[1]))
+                            B_SPK[j] = np.vstack([B_SPK[j], pad])
+
+                    max_len = max([len(spk_c) for spk_c in B_SPK_C])
+                    for j in range(len(B_SPK_C)):
+                        current_len = len(B_SPK_C[j])
+                        if current_len < max_len:
+                            pad = np.zeros(max_len-current_len)
+                            pad = pad + 2
+                            B_SPK_C[j] = np.concatenate([B_SPK_C[j], pad])
+
+                if mode == 'vanilla_crf':
+                    yield (np.array(B_X),
+                           np.array(B_Y))
+                if mode == 'vanilla_crf-spk':
+                    yield ([np.array(B_X), np.array(B_SPK)],
+                           np.array(B_Y))
+                if mode == 'our_crf-spk_c':
+                    yield ([np.array(B_X), np.array(B_SPK_C)],
+                           np.array(B_Y))
+
+                B_X, B_Y, B_SPK, B_SPK_C = [], [], [], []
+
+
+def get_s2v_module(word_embedding_matrix, n_hidden):
+    # TODO add dropout, stack LSTM
+    embedding_layer = Embedding(
+        word_embedding_matrix.shape[0],
+        word_embedding_matrix.shape[1],
+        embeddings_initializer=Constant(word_embedding_matrix),
+        trainable=False,
+        mask_zero=True
+    )
+
+    lstm_layer = LSTM(
+        units=n_hidden,
+        activation='tanh',
+        return_sequences=False
+    )
+
+    input = Input(shape=(None,), dtype='int32')
+    output = lstm_layer(embedding_layer(input))
+    model = Model(input, output)
+    model.summary()
+
+    return model
+
+
+def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, mode, path_to_results):
+    n_hidden = word_embedding_matrix.shape[1]
+    n_train_samples = len(X['train'])
+    n_valid_samples = len(X['valid'])
+
+    callbacks = [ModelCheckpoint(filepath=path_to_results+'model_on_epoch_end/'+'{epoch}.h5',
+                                 save_weights_only=True),
+                 EarlyStopping(monitor='val_loss', patience=10)]
+
+    input_X = Input(shape=(None, None), dtype='int32')
+    s2v_module = get_s2v_module(word_embedding_matrix, n_hidden)
+    output = TimeDistributed(s2v_module)(input_X)
+
+
+    bilstm_layer = Bidirectional(LSTM(units=n_hidden,
+                                      activation='tanh',
+                                      return_sequences=True),
+                                 merge_mode='concat')
+    if mode == 'vanilla_crf':
+        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1)
+        crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
+        output = crf(dense_layer(bilstm_layer(output)))
+
+        model = Model(input_X, output)
+        model.summary()
+        model.compile(optimizer='adam', loss=crf.loss, metrics=[])
+
+        history = model.fit_generator(
+            data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
+            steps_per_epoch=ceil(n_train_samples/batch_size),
+            epochs=epochs,
+            validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
+            validation_steps=ceil(n_valid_samples/batch_size),
+            callbacks=callbacks
+        )
+    if mode == 'vanilla_crf-spk':
+        input_SPK = Input(shape=(None, n_spks), dtype='float32')
+        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1)
+        crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
+        output = crf(dense_layer(bilstm_layer(concatenate([input_SPK, output]))))
+
+        model = Model([input_X, input_SPK], output)
+        model.summary()
+        model.compile(optimizer='adam', loss=crf.loss, metrics=[])
+
+        history = model.fit_generator(
+            data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
+            steps_per_epoch=ceil(n_train_samples/batch_size),
+            epochs=epochs,
+            validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
+            validation_steps=ceil(n_valid_samples/batch_size),
+            callbacks=callbacks
+        )
+    if mode == 'our_crf-spk_c':
+        input_SPK_C = Input(shape=(None,), dtype='int32')
+        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
+        crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
+        output = crf(dense_layer(bilstm_layer(output)))
+
+        model = Model([input_X, input_SPK_C], output)
+        model.summary()
+        model.compile(optimizer='adam', loss=crf.loss_wrapper(input_SPK_C), metrics=[])
+
+        history = model.fit_generator(
+            data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
+            steps_per_epoch=ceil(n_train_samples/batch_size),
+            epochs=epochs,
+            validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
+            validation_steps=ceil(n_valid_samples/batch_size),
+            callbacks=callbacks
+        )
+    else:
+        pass
+
+    return history.history, model
+
+

@@ -10,6 +10,7 @@ if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import LabelBinarizer
 
 
 def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path):
@@ -116,3 +117,21 @@ def save_and_plot_history(history, path_to_results):
 
 def load_history(path_to_results):
     return json.load(open(path_to_results + 'history.json'))
+
+
+class MyLabelBinarizer(LabelBinarizer):
+    """
+    https://stackoverflow.com/questions/31947140/sklearn-labelbinarizer-returns-vector-when-there-are-2-classes
+    """
+    def transform(self, y):
+        Y = super().transform(y)
+        if self.y_type_ == 'binary':
+            return np.hstack((Y, 1-Y))
+        else:
+            return Y
+
+    def inverse_transform(self, Y, threshold=None):
+        if self.y_type_ == 'binary':
+            return super().inverse_transform(Y[:, 0], threshold)
+        else:
+            return super().inverse_transform(Y, threshold)
