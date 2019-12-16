@@ -122,8 +122,8 @@ def load_history(path_to_results):
     return json.load(open(path_to_results + 'history.json'))
 
 
-def save_trans_to_csv(model, header, path_to_results):
-    for idx, trans in enumerate(model.get_layer('vanilla_crf_1').get_weights()):
+def save_trans_to_csv(layer, header, path_to_results):
+    for idx, trans in enumerate(layer.get_weights()):
         pd.DataFrame(
             np.exp(trans),
             index=header, columns=header

@@ -173,7 +173,7 @@ if mode == 'vanilla_crf' or mode == 'vanilla_crf-spk':
             tag_from = tag_lb.classes_[i]
             tag_to = tag_lb.classes_[j]
             trans[(tag_from, tag_to)] = model.get_layer('vanilla_crf_1').get_weights()[0][i, j]
-    utlis.save_trans_to_csv(model, tag_lb.classes_, path_to_results)
+    utlis.save_trans_to_csv(model.get_layer('vanilla_crf_1'), tag_lb.classes_, path_to_results)
 
     y_pred = []
     y_true = []
@@ -197,7 +197,7 @@ if mode == 'our_crf-spk_c':
             tag_to = tag_lb.classes_[j]
             trans0[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[0][i, j]
             trans1[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[1][i, j]
-    utlis.save_trans_to_csv(model, tag_lb.classes_, path_to_results)
+    utlis.save_trans_to_csv(model.get_layer('our_crf_1'), tag_lb.classes_, path_to_results)
 
     y_pred = []
     y_true = []
