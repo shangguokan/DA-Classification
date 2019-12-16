@@ -1,9 +1,12 @@
 import os
 import json
+import pandas as pd
 import numpy as np
+from scipy.special import softmax
 import sentencepiece as spm
 from gensim.models import Word2Vec
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import normalize
 import matplotlib
 if os.environ.get('DISPLAY', '') == '':
     # https://matplotlib.org/faq/usage_faq.html#what-is-a-backend
@@ -117,6 +120,29 @@ def save_and_plot_history(history, path_to_results):
 
 def load_history(path_to_results):
     return json.load(open(path_to_results + 'history.json'))
+
+
+def save_trans_to_csv(model, header, path_to_results):
+    for idx, trans in enumerate(model.get_layer('vanilla_crf_1').get_weights()):
+        pd.DataFrame(
+            np.exp(trans),
+            index=header, columns=header
+        ).to_csv(path_to_results + 'trans' + str(idx) + '.csv')
+
+        pd.DataFrame(
+            normalize(np.exp(trans), norm='l1', axis=1),
+            index=header, columns=header
+        ).to_csv(path_to_results + 'trans' + str(idx) + '_standard.csv')
+
+        pd.DataFrame(
+            softmax(np.exp(trans), axis=1),
+            index=header, columns=header
+        ).to_csv(path_to_results + 'trans' + str(idx) + '_softmax.csv')
+
+        pd.DataFrame(
+            np.argsort(np.argsort(-np.exp(trans), axis=1), axis=1),
+            index=header, columns=header
+        ).to_csv(path_to_results + 'trans' + str(idx) + '_sort.csv')
 
 
 class MyLabelBinarizer(LabelBinarizer):
