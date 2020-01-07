@@ -2,11 +2,12 @@ import os
 import json
 import pandas as pd
 import numpy as np
+import seaborn as sns
 from scipy.special import softmax
 import sentencepiece as spm
 from gensim.models import Word2Vec
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import normalize
+from sklearn.preprocessing import normalize, minmax_scale
 import matplotlib
 if os.environ.get('DISPLAY', '') == '':
     # https://matplotlib.org/faq/usage_faq.html#what-is-a-backend
@@ -122,27 +123,44 @@ def load_history(path_to_results):
     return json.load(open(path_to_results + 'history.json'))
 
 
-def save_trans_to_csv(layer, header, path_to_results):
-    for idx, trans in enumerate(layer.get_weights()):
-        pd.DataFrame(
+def save_trans_to_csv(weights, header, path_to_results):
+    for idx, trans in enumerate(weights):
+        if idx == 2:
+            break
+
+        df = pd.DataFrame(
             np.exp(trans),
             index=header, columns=header
-        ).to_csv(path_to_results + 'trans' + str(idx) + '.csv')
+        )
+        df.to_csv(path_to_results + 'trans' + str(idx) + '.csv')
 
-        pd.DataFrame(
+        df = pd.DataFrame(
+            minmax_scale(np.exp(trans), axis=1),
+            index=header, columns=header
+        )
+        df.to_csv(path_to_results + 'trans' + str(idx) + '_scale.csv')
+        plt.figure(figsize=(13, 10))
+        sns.heatmap(df, xticklabels=1, yticklabels=1, center=1)
+        plt.savefig(path_to_results + 'trans' + str(idx) + '_scale.png', dpi=300, bbox_inches='tight')
+        plt.clf()
+
+        df = pd.DataFrame(
             normalize(np.exp(trans), norm='l1', axis=1),
             index=header, columns=header
-        ).to_csv(path_to_results + 'trans' + str(idx) + '_standard.csv')
+        )
+        df.to_csv(path_to_results + 'trans' + str(idx) + '_standard.csv')
 
-        pd.DataFrame(
+        df = pd.DataFrame(
             softmax(np.exp(trans), axis=1),
             index=header, columns=header
-        ).to_csv(path_to_results + 'trans' + str(idx) + '_softmax.csv')
+        )
+        df.to_csv(path_to_results + 'trans' + str(idx) + '_softmax.csv')
 
-        pd.DataFrame(
+        df = pd.DataFrame(
             np.argsort(np.argsort(-np.exp(trans), axis=1), axis=1),
             index=header, columns=header
-        ).to_csv(path_to_results + 'trans' + str(idx) + '_sort.csv')
+        )
+        df.to_csv(path_to_results + 'trans' + str(idx) + '_sort.csv')
 
 
 class MyLabelBinarizer(LabelBinarizer):
