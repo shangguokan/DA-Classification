@@ -2,7 +2,6 @@ import os
 import json
 import pandas as pd
 import numpy as np
-import seaborn as sns
 from scipy.special import softmax
 import sentencepiece as spm
 from gensim.models import Word2Vec
@@ -15,6 +14,7 @@ if os.environ.get('DISPLAY', '') == '':
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelBinarizer
+import seaborn as sns
 
 
 def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path):
