@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.utils import shuffle
 from keras.models import Model
 from keras.initializers import Constant
-from keras.layers import Input, Dense, Embedding, LSTM
+from keras.layers import Input, Dense, Embedding, LSTM, Dropout
 from keras.layers import TimeDistributed, Bidirectional, concatenate
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from vanilla_crf import VanillaCRF
@@ -72,8 +72,7 @@ def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
                 B_X, B_Y, B_SPK, B_SPK_C = [], [], [], []
 
 
-def get_s2v_module(word_embedding_matrix, n_hidden):
-    # TODO add dropout, stack LSTM
+def get_s2v_module(word_embedding_matrix, n_hidden, dropout_rate):
     embedding_layer = Embedding(
         word_embedding_matrix.shape[0],
         word_embedding_matrix.shape[1],
@@ -88,25 +87,28 @@ def get_s2v_module(word_embedding_matrix, n_hidden):
         return_sequences=False
     )
 
+    dropout_layer_1 = Dropout(dropout_rate)
+    dropout_layer_2 = Dropout(dropout_rate)
+
     input = Input(shape=(None,), dtype='int32')
-    output = lstm_layer(embedding_layer(input))
+    output = dropout_layer_2(lstm_layer(dropout_layer_1(embedding_layer(input))))
     model = Model(input, output)
     model.summary()
 
     return model
 
 
-def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, mode, path_to_results):
+def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results):
     n_hidden = word_embedding_matrix.shape[1]
     n_train_samples = len(X['train'])
     n_valid_samples = len(X['valid'])
 
     callbacks = [ModelCheckpoint(filepath=path_to_results+'model_on_epoch_end/'+'{epoch}.h5',
                                  save_weights_only=True),
-                 EarlyStopping(monitor='val_loss', patience=10)]
+                 EarlyStopping(monitor='val_loss', patience=5)]
 
     input_X = Input(shape=(None, None), dtype='int32')
-    s2v_module = get_s2v_module(word_embedding_matrix, n_hidden)
+    s2v_module = get_s2v_module(word_embedding_matrix, n_hidden, dropout_rate)
     output = TimeDistributed(s2v_module)(input_X)
 
 
@@ -114,10 +116,12 @@ def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch
                                       activation='tanh',
                                       return_sequences=True),
                                  merge_mode='concat')
+    dropout_layer = Dropout(dropout_rate)
+
     if mode == 'vanilla_crf':
         dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1)
         crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer(bilstm_layer(output)))
+        output = crf(dense_layer(dropout_layer(bilstm_layer(output))))
 
         model = Model(input_X, output)
         model.summary()
@@ -135,7 +139,7 @@ def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
         dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1)
         crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer(bilstm_layer(concatenate([input_SPK, output]))))
+        output = crf(dense_layer(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
 
         model = Model([input_X, input_SPK], output)
         model.summary()
@@ -153,7 +157,7 @@ def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch
         input_SPK_C = Input(shape=(None,), dtype='int32')
         dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
         crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer(bilstm_layer(output)))
+        output = crf(dense_layer(dropout_layer(bilstm_layer(output))))
 
         model = Model([input_X, input_SPK_C], output)
         model.summary()
