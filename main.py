@@ -1,5 +1,7 @@
 import os
 import json
+import string
+import secrets
 import numpy as np
 from math import ceil
 from datetime import datetime
@@ -44,7 +46,8 @@ for param in ParameterGrid(param_grid):
     dropout_rate = param['dropout_rate']
 
     ###################################
-    path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '/'
+    fid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(5))
+    path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '_' + fid + '/'
     os.makedirs(path_to_results + 'model_on_epoch_end')
     os.makedirs(path_to_results + 'resource')
 
