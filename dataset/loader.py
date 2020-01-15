@@ -62,7 +62,7 @@ def load_mrda_corpus(conversation_list,
 def load_swda_corpus(conversation_list,
                      strip_punctuation,
                      tokenize_punctuation,
-                     concatenate_interruption=True,
+                     concatenate_interruption,
                      do_lowercase=True):
     """ Load SwDA corpus based on https://github.com/cgpotts/swda
     :param conversation_list:

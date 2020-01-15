@@ -27,6 +27,7 @@ param_grid = {
     'wv_epochs': [20],
 
     'corpus_name': ['swda', 'mrda'],
+    'swda_concatenate_interruption': [True],
     'mrda_tag_map': ['basic'],  # basic, general, full
     'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
     'batch_size': [1, 8],
@@ -42,6 +43,7 @@ for param in ParameterGrid(param_grid):
     wv_epochs = param['wv_epochs']
 
     corpus_name = param['corpus_name']
+    swda_concatenate_interruption = param['swda_concatenate_interruption']
     mrda_tag_map = param['mrda_tag_map']
     mode = param['mode']
     batch_size = param['batch_size']
@@ -57,7 +59,8 @@ for param in ParameterGrid(param_grid):
     swda_corpus, swda_tag_set, swda_speaker_set, swda_symbol_set = load_swda_corpus(
         swda_conversation_list,
         strip_punctuation=strip_punctuation,
-        tokenize_punctuation=True if tokenization_type == 'word' else False
+        tokenize_punctuation=True if tokenization_type == 'word' else False,
+        concatenate_interruption=swda_concatenate_interruption
     )
 
     mrda_conversation_list = mrda_split.train_set_idx + mrda_split.valid_set_idx + mrda_split.test_set_idx
@@ -240,6 +243,6 @@ for param in ParameterGrid(param_grid):
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'mrda_tag_map', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
+            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'swda_concatenate_interruption', 'mrda_tag_map', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
         ))
     K.clear_session()
