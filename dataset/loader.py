@@ -9,7 +9,7 @@ from dataset.swda.swda import CorpusReader
 def load_mrda_corpus(conversation_list,
                      strip_punctuation,
                      tokenize_punctuation,
-                     tag_map='basic'):
+                     tag_map):
     """ Load MRDA corpus based on https://github.com/NathanDuran/MRDA-Corpus
     :param conversation_list:
     :param strip_punctuation:

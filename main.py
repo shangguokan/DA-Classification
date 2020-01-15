@@ -27,6 +27,7 @@ param_grid = {
     'wv_epochs': [20],
 
     'corpus_name': ['swda', 'mrda'],
+    'mrda_tag_map': ['basic'],  # basic, general, full
     'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
     'batch_size': [1, 8],
     'dropout_rate': [0.1, 0.3, 0.5]
@@ -41,6 +42,7 @@ for param in ParameterGrid(param_grid):
     wv_epochs = param['wv_epochs']
 
     corpus_name = param['corpus_name']
+    mrda_tag_map = param['mrda_tag_map']
     mode = param['mode']
     batch_size = param['batch_size']
     dropout_rate = param['dropout_rate']
@@ -62,7 +64,8 @@ for param in ParameterGrid(param_grid):
     mrda_corpus, mrda_tag_set, mrda_speaker_set, mrda_symbol_set = load_mrda_corpus(
         mrda_conversation_list,
         strip_punctuation=strip_punctuation,
-        tokenize_punctuation=True if tokenization_type == 'word' else False
+        tokenize_punctuation=True if tokenization_type == 'word' else False,
+        tag_map=mrda_tag_map
     )
 
     swda_train_val_sentences = [
@@ -237,6 +240,6 @@ for param in ParameterGrid(param_grid):
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
+            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'mrda_tag_map', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
         ))
     K.clear_session()
