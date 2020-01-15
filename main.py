@@ -3,6 +3,7 @@ import json
 import numpy as np
 from math import ceil
 from datetime import datetime
+from keras import backend as K
 from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import LabelEncoder
@@ -25,7 +26,7 @@ param_grid = {
 
     'corpus_name': ['swda', 'mrda'],
     'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
-    'batch_size': [1, 4, 8],
+    'batch_size': [1, 8],
     'dropout_rate': [0.1, 0.3, 0.5]
 }
 
@@ -43,6 +44,9 @@ for param in ParameterGrid(param_grid):
     dropout_rate = param['dropout_rate']
 
     ###################################
+    path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '/'
+    os.makedirs(path_to_results + 'model_on_epoch_end')
+    os.makedirs(path_to_results + 'resource')
 
     swda_conversation_list = swda_split.train_set_idx + swda_split.valid_set_idx + swda_split.test_set_idx
     swda_corpus, swda_tag_set, swda_speaker_set, swda_symbol_set = load_swda_corpus(
@@ -74,9 +78,9 @@ for param in ParameterGrid(param_grid):
         type=tokenization_type,
         user_defined_symbols='▁'+',▁'.join(list(user_defined_symbols)),
         split_by_whitespace=True,
-        path='resource/tokenizer.model'
+        path_to_results=path_to_results
     )
-    tokenizer = utlis.load_tokenizer('resource/tokenizer.model')
+    tokenizer = utlis.load_tokenizer(path_to_results + 'resource/tokenizer.model')
     vocabulary = OrderedDict([(tokenizer.id_to_piece(id), id) for id in range(tokenizer.get_piece_size())])
 
     swda_corpus = utlis.tokenize_corpus(swda_corpus, tokenizer)
@@ -95,9 +99,9 @@ for param in ParameterGrid(param_grid):
         tokenized_sentences,
         wv_dim=wv_dim,
         wv_epochs=wv_epochs,
-        path='resource/wv_swda.bin'
+        path_to_results=path_to_results
     )
-    word_embedding_matrix = utlis.load_word2vec('resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim)
+    word_embedding_matrix = utlis.load_word2vec(path_to_results + 'resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim)
 
     ####################################################
     if corpus_name == 'swda':
@@ -133,9 +137,6 @@ for param in ParameterGrid(param_grid):
         SPK_C[key] = [corpus[cid]['speaker_change'] for cid in value]
 
     ########################
-
-    path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '/'
-    os.makedirs(path_to_results+'model_on_epoch_end')
 
     epochs = 100
     n_tags = len(tag_lb.classes_)
@@ -235,3 +236,4 @@ for param in ParameterGrid(param_grid):
         f.write(json.dumps(
             dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
         ))
+    K.clear_session()

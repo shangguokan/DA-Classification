@@ -17,25 +17,26 @@ from sklearn.preprocessing import LabelBinarizer
 import seaborn as sns
 
 
-def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path):
-    with open('resource/sentences.txt', 'w') as f:
+def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path_to_results):
+    with open(path_to_results + 'resource/sentences.txt', 'w') as f:
         for sentence in sentences:
             f.write(sentence + '\n')
 
     type_is_word = True if type == 'word' else False
 
     spm.SentencePieceTrainer.train(
-        '--input=resource/sentences.txt --character_coverage=1.0 --bos_id=-1 --eos_id=-1 --pad_id=0 --unk_id=1 --pad_piece=<PAD> --unk_piece=<UNK>' +
+        '--input='+path_to_results+'resource/sentences.txt' +
+        ' --character_coverage=1.0 --bos_id=-1 --eos_id=-1 --pad_id=0 --unk_id=1 --pad_piece=<PAD> --unk_piece=<UNK>' +
         ' --user_defined_symbols='+user_defined_symbols +
         ' --vocab_size='+str(vocab_size) +
         ' --model_type='+type +
-        ' --model_prefix='+path.split('.')[0] +
+        ' --model_prefix='+path_to_results+'resource/tokenizer' +
         ' --split_by_whitespace='+str(split_by_whitespace).lower() +
         ' --use_all_vocab='+str(type_is_word).lower()  # https://github.com/google/sentencepiece/issues/200
     )
 
 
-def load_tokenizer(path='resource/tokenizer.model'):
+def load_tokenizer(path):
     model = spm.SentencePieceProcessor()
     model.load(path)
 
@@ -56,8 +57,8 @@ def tokenize_corpus(corpus, tokenizer):
     return corpus
 
 
-def train_and_save_word2vec(tokenized_sentences, wv_dim, wv_epochs, path):
-    with open('resource/tokenized_sentences.txt', 'w') as f:
+def train_and_save_word2vec(tokenized_sentences, wv_dim, wv_epochs, path_to_results):
+    with open(path_to_results + 'resource/tokenized_sentences.txt', 'w') as f:
         for tokenized_sentence in tokenized_sentences:
             f.write(' '.join(tokenized_sentence) + '\n')
 
@@ -65,7 +66,7 @@ def train_and_save_word2vec(tokenized_sentences, wv_dim, wv_epochs, path):
     model.build_vocab(tokenized_sentences)
 
     model.train(tokenized_sentences, total_examples=len(tokenized_sentences), epochs=wv_epochs)
-    model.wv.save_word2vec_format(path, binary=True)
+    model.wv.save_word2vec_format(path_to_results + 'resource/wv_swda.bin', binary=True)
 
 
 def load_word2vec(path, vocabulary, wv_dim, pca_dim):
