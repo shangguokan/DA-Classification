@@ -149,7 +149,7 @@ for param in ParameterGrid(param_grid):
 
     ########################
 
-    epochs = 1
+    epochs = 100
     n_tags = len(tag_lb.classes_)
     n_spks = len(spk_lb.classes_)
     history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results)
