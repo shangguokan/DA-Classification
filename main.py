@@ -21,17 +21,18 @@ from dataset.loader import load_swda_corpus, load_mrda_corpus
 param_grid = {
     'tokenization_type': ['word'],
     'vocab_size_bpe_unigram': [6000],
-    'strip_punctuation': [False],
+    'strip_punctuation': [True],
 
-    'wv_dim': [64, 128, 256, 512],
+    'wv_dim': [300],
     'wv_epochs': [20],
 
     'corpus_name': ['swda', 'mrda'],
     'swda_concatenate_interruption': [True],
     'mrda_tag_map': ['basic'],  # basic, general, full
+    'encoder_type': ['lstm', 'bilstm', 'att-bilstm'],
     'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
-    'batch_size': [1, 8],
-    'dropout_rate': [0.1, 0.3, 0.5]
+    'batch_size': [1],
+    'dropout_rate': [0.2],
 }
 
 for param in ParameterGrid(param_grid):
@@ -45,6 +46,7 @@ for param in ParameterGrid(param_grid):
     corpus_name = param['corpus_name']
     swda_concatenate_interruption = param['swda_concatenate_interruption']
     mrda_tag_map = param['mrda_tag_map']
+    encoder_type = param['encoder_type']
     mode = param['mode']
     batch_size = param['batch_size']
     dropout_rate = param['dropout_rate']
@@ -147,10 +149,10 @@ for param in ParameterGrid(param_grid):
 
     ########################
 
-    epochs = 100
+    epochs = 1
     n_tags = len(tag_lb.classes_)
     n_spks = len(spk_lb.classes_)
-    history, model = trainer.train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results)
+    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results)
     utlis.save_and_plot_history(history, path_to_results)
 
     ########################
@@ -202,7 +204,7 @@ for param in ParameterGrid(param_grid):
                 tag_from = tag_lb.classes_[i]
                 tag_to = tag_lb.classes_[j]
                 trans[(tag_from, tag_to)] = model.get_layer('vanilla_crf_1').get_weights()[0][i, j]
-        utlis.save_trans_to_csv(model.get_layer('vanilla_crf_1').get_weights(), tag_lb.classes_, path_to_results)
+        utlis.save_trans_to_csv(model.get_layer('vanilla_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
 
         y_pred = []
         y_true = []
@@ -226,7 +228,7 @@ for param in ParameterGrid(param_grid):
                 tag_to = tag_lb.classes_[j]
                 trans0[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[0][i, j]
                 trans1[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[1][i, j]
-        utlis.save_trans_to_csv(model.get_layer('our_crf_1').get_weights(), tag_lb.classes_, path_to_results)
+        utlis.save_trans_to_csv(model.get_layer('our_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
 
         y_pred = []
         y_true = []
@@ -243,6 +245,6 @@ for param in ParameterGrid(param_grid):
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'swda_concatenate_interruption', 'mrda_tag_map', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
+            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'swda_concatenate_interruption', 'mrda_tag_map', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
         ))
     K.clear_session()

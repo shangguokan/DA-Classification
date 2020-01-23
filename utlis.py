@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelBinarizer
 import seaborn as sns
 
+from dataset.loader import tag_name_dict
+
 
 def train_and_save_tokenizer(sentences, vocab_size, type, user_defined_symbols, split_by_whitespace, path_to_results):
     with open(path_to_results + 'resource/sentences.txt', 'w') as f:
@@ -124,7 +126,7 @@ def load_history(path_to_results):
     return json.load(open(path_to_results + 'history.json'))
 
 
-def save_trans_to_csv(weights, header, path_to_results):
+def save_trans_to_csv(weights, header, corpus_name, path_to_results):
     for idx, trans in enumerate(weights):
         if idx == 2:
             break
@@ -139,10 +141,21 @@ def save_trans_to_csv(weights, header, path_to_results):
             minmax_scale(np.exp(trans), axis=1),
             index=header, columns=header
         )
-        df.to_csv(path_to_results + 'trans' + str(idx) + '_scale.csv')
+        df.to_csv(path_to_results + 'trans' + str(idx) + '_scale_tag.csv')
         plt.figure(figsize=(13, 10))
         sns.heatmap(df, xticklabels=1, yticklabels=1, center=1)
-        plt.savefig(path_to_results + 'trans' + str(idx) + '_scale.png', dpi=300, bbox_inches='tight')
+        plt.savefig(path_to_results + 'trans' + str(idx) + '_scale_tag.png', dpi=300, bbox_inches='tight')
+        plt.clf()
+
+        header_name = [tag_name_dict[corpus_name][t] for t in header]
+        df = pd.DataFrame(
+            minmax_scale(np.exp(trans), axis=1),
+            index=header_name, columns=header_name
+        )
+        df.to_csv(path_to_results + 'trans' + str(idx) + '_scale_name.csv')
+        plt.figure(figsize=(13, 10))
+        sns.heatmap(df, xticklabels=1, yticklabels=1, center=1)
+        plt.savefig(path_to_results + 'trans' + str(idx) + '_scale_name.png', dpi=300, bbox_inches='tight')
         plt.clf()
 
         df = pd.DataFrame(

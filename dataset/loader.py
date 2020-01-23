@@ -163,3 +163,57 @@ swda_irregular_annotation_strings = [
     "< what to do about these I guess's >",
     '<typo watch=watched >'
 ]
+
+tag_name_dict = {
+'swda': {
+ '%': 'Abandoned or Turn-Exit, Uninterpretable',
+ '^2': 'Collaborative Completion',
+ '^g': 'Tag-Question',
+ '^h': 'Hold before answer/agreement',
+ '^q': 'Quotation',
+ 'aa': 'Agree/Accept',
+ 'aap_am': 'Maybe/Accept-part',
+ 'ad': 'Action-directive',
+ 'ar': 'Reject',
+ 'arp_nd': 'Dispreferred answers',
+ 'b': 'Acknowledge (Backchannel)',
+ 'b^m': 'Repeat-phrase',
+ 'ba': 'Appreciation',
+ 'bd': 'Downplayer',
+ 'bf': 'Summarize/reformulate',
+ 'bh': 'Backchannel in question form',
+ 'bk': 'Response Acknowledgement',
+ 'br': 'Signal-non-understanding',
+ 'fa': 'Apology',
+ 'fc': 'Conventional-closing',
+ 'fo_o_fw_"_by_bc': 'Other',
+ 'fp': 'Conventional-opening',
+ 'ft': 'Thanking',
+ 'h': 'Hedge',
+ 'na': 'Affirmative non-yes answers',
+ 'ng': 'Negative non-no answers',
+ 'nn': 'No answers',
+ 'no': 'Other answers',
+ 'ny': 'Yes answers',
+ 'oo_co_cc': 'Offers, Options, Commits',
+ 'qh': 'Rhetorical-Questions',
+ 'qo': 'Open-Question',
+ 'qrr': 'Or-Clause',
+ 'qw': 'Wh-Question',
+ 'qw^d': 'Declarative Wh-Question',
+ 'qy': 'Yes-No-Question',
+ 'qy^d': 'Declarative Yes-No-Question',
+ 'sd': 'Statement-non-opinion',
+ 'sv': 'Statement-opinion',
+ 't1': 'Self-talk',
+ 't3': '3rd-party-talk',
+ 'x': 'Non-verbal'
+},
+'mrda': {
+  'B': 'BackChannel',
+  'D': 'Disruption',
+  'F': 'FloorGrabber',
+  'Q': 'Question',
+  'S': 'Statement'
+}
+}

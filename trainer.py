@@ -8,6 +8,7 @@ from keras.layers import TimeDistributed, Bidirectional, concatenate
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from vanilla_crf import VanillaCRF
 from our_crf import OurCRF
+from attention_with_context import AttentionWithContext
 
 
 def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
@@ -72,7 +73,9 @@ def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
                 B_X, B_Y, B_SPK, B_SPK_C = [], [], [], []
 
 
-def get_s2v_module(word_embedding_matrix, n_hidden, dropout_rate):
+def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
+    input = Input(shape=(None,), dtype='int32')
+
     embedding_layer = Embedding(
         word_embedding_matrix.shape[0],
         word_embedding_matrix.shape[1],
@@ -81,24 +84,44 @@ def get_s2v_module(word_embedding_matrix, n_hidden, dropout_rate):
         mask_zero=True
     )
 
-    lstm_layer = LSTM(
-        units=n_hidden,
-        activation='tanh',
-        return_sequences=False
-    )
+    output = embedding_layer(input)
 
-    dropout_layer_1 = Dropout(dropout_rate)
-    dropout_layer_2 = Dropout(dropout_rate)
+    if encoder_type == 'lstm':
+        lstm_layer = LSTM(
+            units=n_hidden,
+            activation='tanh',
+            return_sequences=False
+        )
+        output = lstm_layer(output)
 
-    input = Input(shape=(None,), dtype='int32')
-    output = dropout_layer_2(lstm_layer(dropout_layer_1(embedding_layer(input))))
+    if encoder_type == 'bilstm':
+        bilstm_layer = Bidirectional(
+            LSTM(units=n_hidden,
+                 activation='tanh',
+                 return_sequences=False)
+        )
+        output = bilstm_layer(output)
+
+    if encoder_type == 'att-bilstm':
+        bilstm_layer = Bidirectional(
+            LSTM(units=n_hidden,
+                 activation='tanh',
+                 return_sequences=True)
+        )
+        attention_layer = AttentionWithContext()
+        output = attention_layer(bilstm_layer(output))
+
+    dropout_layer = Dropout(dropout_rate)
+
+    output = dropout_layer(output)
+
     model = Model(input, output)
     model.summary()
 
     return model
 
 
-def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results):
+def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results):
     n_hidden = word_embedding_matrix.shape[1]
     n_train_samples = len(X['train'])
     n_valid_samples = len(X['valid'])
@@ -108,20 +131,22 @@ def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch
                  EarlyStopping(monitor='val_loss', patience=5)]
 
     input_X = Input(shape=(None, None), dtype='int32')
-    s2v_module = get_s2v_module(word_embedding_matrix, n_hidden, dropout_rate)
+    s2v_module = get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate)
     output = TimeDistributed(s2v_module)(input_X)
 
 
-    bilstm_layer = Bidirectional(LSTM(units=n_hidden,
-                                      activation='tanh',
-                                      return_sequences=True),
-                                 merge_mode='concat')
+    bilstm_layer = Bidirectional(
+        LSTM(units=n_hidden,
+             activation='tanh',
+             return_sequences=True)
+    )
     dropout_layer = Dropout(dropout_rate)
 
     if mode == 'vanilla_crf':
-        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1)
+        dense_layer = Dense(units=n_hidden, activation="relu")
+        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
         crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer(dropout_layer(bilstm_layer(output))))
+        output = crf(dense_layer_crf(dense_layer(dropout_layer(bilstm_layer(output)))))
 
         model = Model(input_X, output)
         model.summary()
@@ -137,9 +162,10 @@ def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch
         )
     if mode == 'vanilla_crf-spk':
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
-        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1)
+        dense_layer = Dense(units=n_hidden, activation="relu")
+        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
         crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
+        output = crf(dense_layer_crf(dense_layer(dropout_layer(bilstm_layer(concatenate([input_SPK, output]))))))
 
         model = Model([input_X, input_SPK], output)
         model.summary()
@@ -155,9 +181,10 @@ def train(X, Y, SPK, SPK_C, word_embedding_matrix, n_tags, n_spks, epochs, batch
         )
     if mode == 'our_crf-spk_c':
         input_SPK_C = Input(shape=(None,), dtype='int32')
-        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
+        dense_layer = Dense(units=n_hidden, activation="relu")
+        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
         crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer(dropout_layer(bilstm_layer(output))))
+        output = crf(dense_layer_crf(dense_layer(dropout_layer(bilstm_layer(output)))))
 
         model = Model([input_X, input_SPK_C], output)
         model.summary()
