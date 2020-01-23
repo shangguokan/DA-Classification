@@ -80,7 +80,7 @@ def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
         word_embedding_matrix.shape[0],
         word_embedding_matrix.shape[1],
         embeddings_initializer=Constant(word_embedding_matrix),
-        trainable=False,
+        trainable=True,
         mask_zero=True
     )
 
