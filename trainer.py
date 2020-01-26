@@ -143,10 +143,9 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
     dropout_layer = Dropout(dropout_rate)
 
     if mode == 'vanilla_crf':
-        dense_layer = Dense(units=n_hidden, activation="relu")
         dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
         crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dense_layer(dropout_layer(bilstm_layer(output)))))
+        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
 
         model = Model(input_X, output)
         model.summary()
@@ -162,10 +161,9 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         )
     if mode == 'vanilla_crf-spk':
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
-        dense_layer = Dense(units=n_hidden, activation="relu")
         dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
         crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dense_layer(dropout_layer(bilstm_layer(concatenate([input_SPK, output]))))))
+        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
 
         model = Model([input_X, input_SPK], output)
         model.summary()
@@ -181,10 +179,9 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         )
     if mode == 'our_crf-spk_c':
         input_SPK_C = Input(shape=(None,), dtype='int32')
-        dense_layer = Dense(units=n_hidden, activation="relu")
         dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
         crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dense_layer(dropout_layer(bilstm_layer(output)))))
+        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
 
         model = Model([input_X, input_SPK_C], output)
         model.summary()
