@@ -21,7 +21,7 @@ from dataset.loader import load_swda_corpus, load_mrda_corpus
 param_grid = {
     'tokenization_type': ['word'],
     'vocab_size_bpe_unigram': [6000],
-    'strip_punctuation': [True],
+    'strip_punctuation': [False],
 
     'wv_dim': [300],
     'wv_epochs': [20],
