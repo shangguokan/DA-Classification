@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.utils import shuffle
 from keras.models import Model
 from keras.initializers import Constant
+from keras.constraints import UnitNorm
 from keras.layers import Input, Dense, Embedding, LSTM, Dropout
 from keras.layers import TimeDistributed, Bidirectional, concatenate
 from keras.callbacks import ModelCheckpoint, EarlyStopping
@@ -108,7 +109,7 @@ def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
                  activation='tanh',
                  return_sequences=True)
         )
-        attention_layer = AttentionWithContext()
+        attention_layer = AttentionWithContext(u_constraint=UnitNorm())
         output = attention_layer(bilstm_layer(output))
 
     dropout_layer = Dropout(dropout_rate)
