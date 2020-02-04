@@ -68,11 +68,14 @@ def train_and_save_word2vec(tokenized_sentences, wv_dim, wv_epochs, path_to_resu
     model.build_vocab(tokenized_sentences)
 
     model.train(tokenized_sentences, total_examples=len(tokenized_sentences), epochs=wv_epochs)
-    model.wv.save_word2vec_format(path_to_results + 'resource/wv_swda.bin', binary=True)
+    model.wv.save_word2vec_format(path_to_results + 'resource/wv.bin', binary=True)
 
 
-def load_word2vec(path, vocabulary, wv_dim, pca_dim):
-    vocabulary = list(vocabulary.keys())
+def load_word2vec(path, vocabulary, wv_dim, pca_dim, path_to_results):
+    with open(path_to_results + 'resource/vocabulary.txt', 'w') as f:
+        for word in vocabulary:
+            f.write(word + '\n')
+
     model = Word2Vec(size=wv_dim, min_count=1)
     model.build_vocab_from_freq(dict.fromkeys(vocabulary, 1))
 

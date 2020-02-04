@@ -7,9 +7,9 @@ from dataset.swda.swda import CorpusReader
 
 
 def load_mrda_corpus(conversation_list,
-                     strip_punctuation,
-                     tokenize_punctuation,
-                     tag_map):
+                     tag_map,
+                     strip_punctuation=False,
+                     tokenize_punctuation=True):
     """ Load MRDA corpus based on https://github.com/NathanDuran/MRDA-Corpus
     :param conversation_list:
     :param strip_punctuation:
@@ -20,7 +20,6 @@ def load_mrda_corpus(conversation_list,
     corpus = defaultdict(lambda: defaultdict(list))
     tag_set = set()
     speaker_set = set()
-    symbol_set = set()
 
     for conversation_id in conversation_list:
         for path in ['dataset/MRDA-Corpus/mrda_data/'+folder+'/'+conversation_id+'.txt'
@@ -56,13 +55,13 @@ def load_mrda_corpus(conversation_list,
 
                 break
 
-    return corpus, tag_set, speaker_set, symbol_set
+    return corpus, tag_set, speaker_set
 
 
 def load_swda_corpus(conversation_list,
-                     strip_punctuation,
-                     tokenize_punctuation,
                      concatenate_interruption,
+                     strip_punctuation=False,
+                     tokenize_punctuation=True,
                      do_lowercase=True):
     """ Load SwDA corpus based on https://github.com/cgpotts/swda
     :param conversation_list:
@@ -75,8 +74,6 @@ def load_swda_corpus(conversation_list,
     corpus = defaultdict(lambda: defaultdict(list))
     tag_set = set()
     speaker_set = set()
-    symbol_set = set()
-    symbol_set.add('<CONNECTOR>')
 
     for trans in CorpusReader('dataset/swda/swda').iter_transcripts():
         conversation_id = 'sw' + str(trans.conversation_no)
@@ -120,12 +117,10 @@ def load_swda_corpus(conversation_list,
 
             sentence = sentence.split()
             if len(sentence) == 0:
-                sentence = ['<non_verbal>']
+                continue
             if len(sentence) == 1 and sentence[0] in '.,?!":':
-                sentence = ['<non_verbal>'] + sentence
+                continue
             sentence = ' '.join(sentence)
-
-            symbol_set.update(re.findall("<[^>]*>", sentence))
 
             utt_tag = utt.damsl_act_tag()
             if (utt_tag != '+') or (utt_tag == '+' and concatenate_interruption is False):
@@ -136,15 +131,12 @@ def load_swda_corpus(conversation_list,
                 speaker_set.add(utt.caller)
             # resolve issue related to tag '+' (check section 2 of the Coders' Manual)
             else:
-                concatenated = False
                 for i in reversed(range(len(corpus[conversation_id]['tag']))):
                     if corpus[conversation_id]['speaker'][i] == utt.caller:
-                        corpus[conversation_id]['sentence'][i] += ' <CONNECTOR> '+sentence
-                        concatenated = True
+                        corpus[conversation_id]['sentence'][i] += ' '+sentence
                         break
-                assert concatenated is True, 'please comment out the line #195 of dataset/swda/swda.py.'
 
-    return corpus, tag_set, speaker_set, symbol_set
+    return corpus, tag_set, speaker_set
 
 
 swda_irregular_annotation_strings = [
@@ -166,6 +158,7 @@ swda_irregular_annotation_strings = [
 
 tag_name_dict = {
 'swda': {
+ '+': 'Interruption',
  '%': 'Abandoned or Turn-Exit, Uninterpretable',
  '^2': 'Collaborative Completion',
  '^g': 'Tag-Question',

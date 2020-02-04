@@ -2,11 +2,11 @@ import os
 import json
 import string
 import secrets
+import pickle
 import numpy as np
 from math import ceil
 from datetime import datetime
 from keras import backend as K
-from collections import OrderedDict
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import ParameterGrid
@@ -19,115 +19,78 @@ from dataset.loader import load_swda_corpus, load_mrda_corpus
 
 
 param_grid = {
-    'tokenization_type': ['word'],
-    'vocab_size_bpe_unigram': [6000],
-    'strip_punctuation': [False],
+    'wv_dim': [10],
+    'wv_epochs': [300],
 
-    'wv_dim': [300],
-    'wv_epochs': [20],
-
-    'corpus_name': ['swda', 'mrda'],
+    'corpus_name': ['mrda'],  # swda, mrda
     'swda_concatenate_interruption': [True],
     'mrda_tag_map': ['basic'],  # basic, general, full
-    'encoder_type': ['lstm', 'bilstm', 'att-bilstm'],
+
+    'encoder_type': ['lstm'],  # lstm, bilstm, att-bilstm
     'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
     'batch_size': [1],
     'dropout_rate': [0.2],
 }
 
 for param in ParameterGrid(param_grid):
-    tokenization_type = param['tokenization_type']  # word, bpe, unigram
-    vocab_size_bpe_unigram = param['vocab_size_bpe_unigram']
-    strip_punctuation = param['strip_punctuation']
-
     wv_dim = param['wv_dim']
     wv_epochs = param['wv_epochs']
 
     corpus_name = param['corpus_name']
     swda_concatenate_interruption = param['swda_concatenate_interruption']
     mrda_tag_map = param['mrda_tag_map']
+
     encoder_type = param['encoder_type']
     mode = param['mode']
     batch_size = param['batch_size']
     dropout_rate = param['dropout_rate']
 
-    ###################################
-    fid = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(5))
-    path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '_' + fid + '/'
+    f_id = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(5))
+    path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '_' + f_id + '/'
     os.makedirs(path_to_results + 'model_on_epoch_end')
     os.makedirs(path_to_results + 'resource')
 
-    swda_conversation_list = swda_split.train_set_idx + swda_split.valid_set_idx + swda_split.test_set_idx
-    swda_corpus, swda_tag_set, swda_speaker_set, swda_symbol_set = load_swda_corpus(
-        swda_conversation_list,
-        strip_punctuation=strip_punctuation,
-        tokenize_punctuation=True if tokenization_type == 'word' else False,
-        concatenate_interruption=swda_concatenate_interruption
-    )
+    ###################################
 
-    mrda_conversation_list = mrda_split.train_set_idx + mrda_split.valid_set_idx + mrda_split.test_set_idx
-    mrda_corpus, mrda_tag_set, mrda_speaker_set, mrda_symbol_set = load_mrda_corpus(
-        mrda_conversation_list,
-        strip_punctuation=strip_punctuation,
-        tokenize_punctuation=True if tokenization_type == 'word' else False,
-        tag_map=mrda_tag_map
-    )
+    if corpus_name == 'swda':
+        train_set_idx, valid_set_idx, test_set_idx = swda_split.train_set_idx, swda_split.valid_set_idx, swda_split.test_set_idx
+        conversation_list = train_set_idx + valid_set_idx + test_set_idx
 
-    swda_train_val_sentences = [
-        sentence for conversation_id in swda_split.train_set_idx + swda_split.valid_set_idx
-        for sentence in swda_corpus[conversation_id]['sentence']
-    ]
-    mrda_train_val_sentences = [
-        sentence for conversation_id in mrda_split.train_set_idx + mrda_split.valid_set_idx
-        for sentence in mrda_corpus[conversation_id]['sentence']
-    ]
-    sentences = swda_train_val_sentences + mrda_train_val_sentences
-    user_defined_symbols = swda_symbol_set.union(mrda_symbol_set)
-    utlis.train_and_save_tokenizer(
-        sentences,
-        vocab_size=vocab_size_bpe_unigram,
-        type=tokenization_type,
-        user_defined_symbols='▁'+',▁'.join(list(user_defined_symbols)),
-        split_by_whitespace=True,
-        path_to_results=path_to_results
-    )
-    tokenizer = utlis.load_tokenizer(path_to_results + 'resource/tokenizer.model')
-    vocabulary = OrderedDict([(tokenizer.id_to_piece(id), id) for id in range(tokenizer.get_piece_size())])
+        corpus, tag_set, speaker_set = load_swda_corpus(conversation_list, swda_concatenate_interruption)
 
-    swda_corpus = utlis.tokenize_corpus(swda_corpus, tokenizer)
-    mrda_corpus = utlis.tokenize_corpus(mrda_corpus, tokenizer)
+    if corpus_name == 'mrda':
+        train_set_idx, valid_set_idx, test_set_idx = mrda_split.train_set_idx, mrda_split.valid_set_idx, mrda_split.test_set_idx
+        conversation_list = train_set_idx + valid_set_idx + test_set_idx
 
-    swda_train_val_tokenized_sentences = [
-        sentence for conversation_id in swda_split.train_set_idx + swda_split.valid_set_idx
-        for sentence in swda_corpus[conversation_id]['tokenized_sentence']
+        corpus, tag_set, speaker_set = load_mrda_corpus(conversation_list, mrda_tag_map)
+
+    vocabulary = ['[PAD]'] + list(set([
+        word
+        for conversation_id in conversation_list
+        for sentence in corpus[conversation_id]['sentence']
+        for word in sentence.split()
+    ]))
+
+    word2idx = {vocabulary[i]: i for i in range(len(vocabulary))}
+    for conversation_id in conversation_list:
+        corpus[conversation_id]['sequence'] = [
+            [word2idx[word] for word in sentence.split()]
+            for sentence in corpus[conversation_id]['sentence']
+        ]
+
+    train_val_sentences = [
+        sentence.split() for conversation_id in train_set_idx + valid_set_idx
+        for sentence in corpus[conversation_id]['sentence']
     ]
-    mrda_train_val_tokenized_sentences = [
-        sentence for conversation_id in mrda_split.train_set_idx + mrda_split.valid_set_idx
-        for sentence in mrda_corpus[conversation_id]['tokenized_sentence']
-    ]
-    tokenized_sentences = swda_train_val_tokenized_sentences + mrda_train_val_tokenized_sentences
     utlis.train_and_save_word2vec(
-        tokenized_sentences,
+        train_val_sentences,
         wv_dim=wv_dim,
         wv_epochs=wv_epochs,
         path_to_results=path_to_results
     )
-    word_embedding_matrix = utlis.load_word2vec(path_to_results + 'resource/wv_swda.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim)
+    word_embedding_matrix = utlis.load_word2vec(path_to_results + 'resource/wv.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim, path_to_results=path_to_results)
 
     ####################################################
-    if corpus_name == 'swda':
-        conversation_list = swda_conversation_list
-        corpus = swda_corpus
-        tag_set = swda_tag_set
-        speaker_set = swda_speaker_set
-        train_set_idx, valid_set_idx, test_set_idx = swda_split.train_set_idx, swda_split.valid_set_idx, swda_split.test_set_idx
-    else:
-        conversation_list = mrda_conversation_list
-        corpus = mrda_corpus
-        tag_set = mrda_tag_set
-        speaker_set = mrda_speaker_set
-        train_set_idx, valid_set_idx, test_set_idx = mrda_split.train_set_idx, mrda_split.valid_set_idx, mrda_split.test_set_idx
-
 
     seq_lens = [len(seq) for cid in conversation_list for seq in corpus[cid]['sequence']]
     tag_lb = MyLabelBinarizer().fit(list(tag_set))
@@ -218,6 +181,9 @@ for param in ParameterGrid(param_grid):
             y_pred = y_pred + list(tags)
             y_true = y_true + list(tag_lb.inverse_transform(Y['test'][i]))
 
+            corpus[test_set_idx[i]]['prediction'] = list(tags)
+            corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
+
         final_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
 
     if mode == 'our_crf-spk_c':
@@ -239,12 +205,17 @@ for param in ParameterGrid(param_grid):
             y_pred = y_pred + list(tags)
             y_true = y_true + list(tag_lb.inverse_transform(Y['test'][i]))
 
+            corpus[test_set_idx[i]]['prediction'] = list(tags)
+            corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
+
         final_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
 
     print(final_accuracy)
 
+    pickle.dump({cid: corpus[cid] for cid in test_set_idx}, open(path_to_results + 'prediction.pkl', 'wb'))
+
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('tokenization_type', 'vocab_size_bpe_unigram', 'strip_punctuation', 'wv_dim', 'wv_epochs', 'corpus_name', 'swda_concatenate_interruption', 'mrda_tag_map', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
+            dict(((k, eval(k)) for k in ('wv_dim', 'wv_epochs', 'corpus_name', 'swda_concatenate_interruption', 'mrda_tag_map', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
         ))
     K.clear_session()
