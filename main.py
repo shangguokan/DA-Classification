@@ -22,7 +22,7 @@ param_grid = {
     'wv_dim': [10],
     'wv_epochs': [300],
 
-    'corpus_name': ['mrda'],  # swda, mrda
+    'corpus_name': ['swda'],  # swda, mrda
     'swda_concatenate_interruption': [True],
     'mrda_tag_map': ['basic'],  # basic, general, full
 
@@ -49,6 +49,7 @@ for param in ParameterGrid(param_grid):
     path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '_' + f_id + '/'
     os.makedirs(path_to_results + 'model_on_epoch_end')
     os.makedirs(path_to_results + 'resource')
+    print('path_to_results', path_to_results)
 
     ###################################
 
