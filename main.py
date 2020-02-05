@@ -19,8 +19,8 @@ from dataset.loader import load_swda_corpus, load_mrda_corpus
 
 
 param_grid = {
-    'wv_dim': [10],
-    'wv_epochs': [300],
+    'wv_dim': [300],
+    'wv_epochs': [20],
 
     'corpus_name': ['swda'],  # swda, mrda
     'swda_concatenate_interruption': [True],
