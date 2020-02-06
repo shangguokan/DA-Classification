@@ -65,33 +65,26 @@ for param in ParameterGrid(param_grid):
 
         corpus, tag_set, speaker_set = load_mrda_corpus(conversation_list, mrda_tag_map)
 
-    vocabulary = ['[PAD]'] + list(set([
-        word
-        for conversation_id in conversation_list
-        for sentence in corpus[conversation_id]['sentence']
-        for word in sentence.split()
-    ]))
-
-    word2idx = {vocabulary[i]: i for i in range(len(vocabulary))}
-    for conversation_id in conversation_list:
-        corpus[conversation_id]['sequence'] = [
-            [word2idx[word] for word in sentence.split()]
-            for sentence in corpus[conversation_id]['sentence']
-        ]
-
     train_val_sentences = [
         sentence.split() for conversation_id in train_set_idx + valid_set_idx
         for sentence in corpus[conversation_id]['sentence']
     ]
-    utlis.train_and_save_word2vec(
+    vocabulary = utlis.train_and_save_word2vec(
         train_val_sentences,
         wv_dim=wv_dim,
         wv_epochs=wv_epochs,
         path_to_results=path_to_results
     )
+    vocabulary = ['[PAD]', '[UNK]'] + vocabulary
     word_embedding_matrix = utlis.load_word2vec(path_to_results + 'resource/wv.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim, path_to_results=path_to_results)
 
     ####################################################
+    word2idx = {vocabulary[i]: i for i in range(len(vocabulary))}
+    for conversation_id in conversation_list:
+        corpus[conversation_id]['sequence'] = [
+            utlis.encode_as_ids(sentence, word2idx)
+            for sentence in corpus[conversation_id]['sentence']
+        ]
 
     seq_lens = [len(seq) for cid in conversation_list for seq in corpus[cid]['sequence']]
     tag_lb = MyLabelBinarizer().fit(list(tag_set))

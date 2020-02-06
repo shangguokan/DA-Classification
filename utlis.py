@@ -64,11 +64,13 @@ def train_and_save_word2vec(tokenized_sentences, wv_dim, wv_epochs, path_to_resu
         for tokenized_sentence in tokenized_sentences:
             f.write(' '.join(tokenized_sentence) + '\n')
 
-    model = Word2Vec(size=wv_dim, min_count=1)
+    model = Word2Vec(size=wv_dim)
     model.build_vocab(tokenized_sentences)
 
     model.train(tokenized_sentences, total_examples=len(tokenized_sentences), epochs=wv_epochs)
     model.wv.save_word2vec_format(path_to_results + 'resource/wv.bin', binary=True)
+
+    return list(model.wv.vocab.keys())
 
 
 def load_word2vec(path, vocabulary, wv_dim, pca_dim, path_to_results):
@@ -196,3 +198,13 @@ class MyLabelBinarizer(LabelBinarizer):
             return super().inverse_transform(Y[:, 0], threshold)
         else:
             return super().inverse_transform(Y, threshold)
+
+
+def encode_as_ids(sentence, word2idx):
+    tmp = []
+    for word in sentence.split():
+        try:
+            tmp.append(word2idx[word])
+        except:
+            tmp.append(1)
+    return tmp
