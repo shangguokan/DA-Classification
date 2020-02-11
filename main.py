@@ -1,31 +1,78 @@
 import os
+import csv
 import json
+import utlis
 import string
-import secrets
 import pickle
+import secrets
+import trainer
 import numpy as np
 from math import ceil
+from nltk.util import ngrams
 from datetime import datetime
 from keras import backend as K
-from sklearn.metrics import accuracy_score
+from utlis import MyLabelBinarizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import ParameterGrid
+from dataset.loader import get_splits, load_corpus
 from keras.preprocessing.sequence import pad_sequences
-import utlis
-import trainer
-from utlis import MyLabelBinarizer
-from dataset import swda_split, mrda_split
-from dataset.loader import load_swda_corpus, load_mrda_corpus
+from sklearn.metrics import accuracy_score, confusion_matrix
 
+corpus_name = 'swda'
+
+train_set_idx, valid_set_idx, test_set_idx = get_splits(corpus_name)
+conversation_list = train_set_idx + valid_set_idx + test_set_idx
+train_set_idx = train_set_idx[0:3]
+
+corpus, tag_set, speaker_set = load_corpus(corpus_name, conversation_list)
+
+if os.path.isfile('resource/vocabulary-'+corpus_name+'.txt'):
+    vocabulary = open('resource/vocabulary-'+corpus_name+'.txt', 'r').read().splitlines()
+else:
+    train_val_sentences = [
+        sentence.split() for conversation_id in train_set_idx + valid_set_idx
+        for sentence in corpus[conversation_id]['sentence']
+    ]
+    vocabulary = utlis.train_and_save_word2vec(
+        corpus_name,
+        train_val_sentences,
+        wv_dim=300,
+        wv_epochs=30
+    )
+vocabulary = ['[PAD]', '[UNK]'] + vocabulary
+word_embedding_matrix = utlis.load_word2vec('resource/wv-'+corpus_name+'.bin', vocabulary, wv_dim=300, pca_dim=300)
+
+##########
+
+word2idx = {vocabulary[i]: i for i in range(len(vocabulary))}
+for conversation_id in conversation_list:
+    corpus[conversation_id]['sequence'] = [
+        utlis.encode_as_ids(sentence, word2idx)
+        for sentence in corpus[conversation_id]['sentence']
+    ]
+
+seq_lens = [len(seq) for cid in conversation_list for seq in corpus[cid]['sequence']]
+tag_lb = MyLabelBinarizer().fit(list(tag_set))
+spk_le = LabelEncoder().fit(list(speaker_set))
+spk_lb = MyLabelBinarizer().fit(range(len(speaker_set)))
+
+for cid in conversation_list:
+    corpus[cid]['sequence'] = pad_sequences(corpus[cid]['sequence'], maxlen=max(seq_lens), padding='post', truncating='post')
+    corpus[cid]['tag'] = tag_lb.transform(corpus[cid]['tag'])
+    corpus[cid]['speaker'] = spk_le.transform(corpus[cid]['speaker'])
+    corpus[cid]['speaker_change'] = np.not_equal(corpus[cid]['speaker'][:-1], corpus[cid]['speaker'][1:]).astype(int)
+    corpus[cid]['speaker'] = spk_lb.transform(corpus[cid]['speaker'])
+
+X, Y, SPK, SPK_C = dict(), dict(), dict(), dict()
+for key, value in zip(['train', 'valid', 'test'], [train_set_idx, valid_set_idx, test_set_idx]):
+    X[key] = [corpus[cid]['sequence'] for cid in value]
+    Y[key] = [corpus[cid]['tag'] for cid in value]
+    SPK[key] = [corpus[cid]['speaker'] for cid in value]
+    SPK_C[key] = [corpus[cid]['speaker_change'] for cid in value]
+
+##########
 
 param_grid = {
-    'wv_dim': [300],
-    'wv_epochs': [20],
-
-    'corpus_name': ['swda'],  # swda, mrda
-    'swda_concatenate_interruption': [True],
-    'mrda_tag_map': ['basic'],  # basic, general, full
-
     'encoder_type': ['lstm'],  # lstm, bilstm, att-bilstm
     'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
     'batch_size': [1],
@@ -33,13 +80,6 @@ param_grid = {
 }
 
 for param in ParameterGrid(param_grid):
-    wv_dim = param['wv_dim']
-    wv_epochs = param['wv_epochs']
-
-    corpus_name = param['corpus_name']
-    swda_concatenate_interruption = param['swda_concatenate_interruption']
-    mrda_tag_map = param['mrda_tag_map']
-
     encoder_type = param['encoder_type']
     mode = param['mode']
     batch_size = param['batch_size']
@@ -48,73 +88,17 @@ for param in ParameterGrid(param_grid):
     f_id = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(5))
     path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '_' + f_id + '/'
     os.makedirs(path_to_results + 'model_on_epoch_end')
-    os.makedirs(path_to_results + 'resource')
     print('path_to_results', path_to_results)
 
-    ###################################
-
-    if corpus_name == 'swda':
-        train_set_idx, valid_set_idx, test_set_idx = swda_split.train_set_idx, swda_split.valid_set_idx, swda_split.test_set_idx
-        conversation_list = train_set_idx + valid_set_idx + test_set_idx
-
-        corpus, tag_set, speaker_set = load_swda_corpus(conversation_list, swda_concatenate_interruption)
-
-    if corpus_name == 'mrda':
-        train_set_idx, valid_set_idx, test_set_idx = mrda_split.train_set_idx, mrda_split.valid_set_idx, mrda_split.test_set_idx
-        conversation_list = train_set_idx + valid_set_idx + test_set_idx
-
-        corpus, tag_set, speaker_set = load_mrda_corpus(conversation_list, mrda_tag_map)
-
-    train_val_sentences = [
-        sentence.split() for conversation_id in train_set_idx + valid_set_idx
-        for sentence in corpus[conversation_id]['sentence']
-    ]
-    vocabulary = utlis.train_and_save_word2vec(
-        train_val_sentences,
-        wv_dim=wv_dim,
-        wv_epochs=wv_epochs,
-        path_to_results=path_to_results
-    )
-    vocabulary = ['[PAD]', '[UNK]'] + vocabulary
-    word_embedding_matrix = utlis.load_word2vec(path_to_results + 'resource/wv.bin', vocabulary, wv_dim=wv_dim, pca_dim=wv_dim, path_to_results=path_to_results)
-
-    ####################################################
-    word2idx = {vocabulary[i]: i for i in range(len(vocabulary))}
-    for conversation_id in conversation_list:
-        corpus[conversation_id]['sequence'] = [
-            utlis.encode_as_ids(sentence, word2idx)
-            for sentence in corpus[conversation_id]['sentence']
-        ]
-
-    seq_lens = [len(seq) for cid in conversation_list for seq in corpus[cid]['sequence']]
-    tag_lb = MyLabelBinarizer().fit(list(tag_set))
-    spk_le = LabelEncoder().fit(list(speaker_set))
-    spk_lb = MyLabelBinarizer().fit(range(len(speaker_set)))
-    for cid in conversation_list:
-        corpus[cid]['sequence'] = pad_sequences(corpus[cid]['sequence'], maxlen=max(seq_lens), padding='post', truncating='post')
-        corpus[cid]['tag'] = tag_lb.transform(corpus[cid]['tag'])
-        corpus[cid]['speaker'] = spk_le.transform(corpus[cid]['speaker'])
-        corpus[cid]['speaker_change'] = np.not_equal(corpus[cid]['speaker'][:-1], corpus[cid]['speaker'][1:]).astype(int)
-        corpus[cid]['speaker'] = spk_lb.transform(corpus[cid]['speaker'])
-
-    X, Y, SPK, SPK_C = dict(), dict(), dict(), dict()
-    for key, value in zip(['train', 'valid', 'test'], [train_set_idx, valid_set_idx, test_set_idx]):
-        X[key] = [corpus[cid]['sequence'] for cid in value]
-        Y[key] = [corpus[cid]['tag'] for cid in value]
-        SPK[key] = [corpus[cid]['speaker'] for cid in value]
-        SPK_C[key] = [corpus[cid]['speaker_change'] for cid in value]
-
-    ########################
-
-    epochs = 100
     n_tags = len(tag_lb.classes_)
     n_spks = len(spk_lb.classes_)
-    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results)
+    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, mode, path_to_results)
     utlis.save_and_plot_history(history, path_to_results)
 
-    ########################
+    ##########
+
     val_loss_list = np.array(history['val_loss'])
-    best_epoch = int(np.where(val_loss_list == val_loss_list.min())[0][-1] + 1)  # epochs count from 1
+    best_epoch = int(np.where(val_loss_list == val_loss_list.min())[0][-1] + 1)
     val_loss = val_loss_list[best_epoch-1]
 
     print('the best epoch based on val_loss:', best_epoch)
@@ -123,36 +107,6 @@ for param in ParameterGrid(param_grid):
     test_loss = model.evaluate_generator(
         trainer.data_generator('test', X, Y, SPK, SPK_C, mode, batch_size),
         steps=ceil(n_test_samples/batch_size))
-
-
-    def viterbi_vanilla_crf(nodes, trans):
-        paths = {(k,): v for k, v in nodes[0].items()}
-        for l in range(1, len(nodes)):
-            paths_old,paths = paths,{}
-            for n,ns in nodes[l].items():
-                max_path,max_score = '',-1e10
-                for p,ps in paths_old.items():
-                    score = ns + ps + trans[(p[-1], n)]
-                    if score > max_score:
-                        max_path,max_score = p+(n,), score
-                paths[max_path] = max_score
-        return max(paths, key=paths.get)
-
-
-    def viterbi_our_crf(nodes, trans0, trans1, spk_change_sequence):
-        paths = {(k,): v for k, v in nodes[0].items()}
-        for l in range(1, len(nodes)):
-            paths_old,paths = paths,{}
-            trans = trans0 if spk_change_sequence[l-1] == 0 else trans1
-            for n,ns in nodes[l].items():
-                max_path,max_score = '',-1e10
-                for p,ps in paths_old.items():
-                    score = ns + ps + trans[(p[-1], n)]
-                    if score > max_score:
-                        max_path,max_score = p+(n,), score
-                paths[max_path] = max_score
-        return max(paths, key=paths.get)
-
 
     if mode == 'vanilla_crf' or mode == 'vanilla_crf-spk':
         trans = {}
@@ -163,22 +117,16 @@ for param in ParameterGrid(param_grid):
                 trans[(tag_from, tag_to)] = model.get_layer('vanilla_crf_1').get_weights()[0][i, j]
         utlis.save_trans_to_csv(model.get_layer('vanilla_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
 
-        y_pred = []
-        y_true = []
         for i in range(n_test_samples):
             if mode == 'vanilla_crf':
                 probas = model.predict(np.array([X['test'][i]]))[0]
             if mode == 'vanilla_crf-spk':
                 probas = model.predict([np.array([X['test'][i]]), np.array([SPK['test'][i]])])[0]
             nodes = [dict(zip(tag_lb.classes_, j)) for j in probas[:, :n_tags]]
-            tags = viterbi_vanilla_crf(nodes, trans)
-            y_pred = y_pred + list(tags)
-            y_true = y_true + list(tag_lb.inverse_transform(Y['test'][i]))
+            tags = utlis.viterbi_vanilla_crf(nodes, trans)
 
             corpus[test_set_idx[i]]['prediction'] = list(tags)
             corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
-
-        final_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
 
     if mode == 'our_crf-spk_c':
         trans0, trans1 = {}, {}
@@ -190,26 +138,65 @@ for param in ParameterGrid(param_grid):
                 trans1[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[1][i, j]
         utlis.save_trans_to_csv(model.get_layer('our_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
 
-        y_pred = []
-        y_true = []
         for i in range(n_test_samples):
             probas = model.predict([np.array([X['test'][i]]), np.array([SPK_C['test'][i]])])[0]
             nodes = [dict(zip(tag_lb.classes_, j)) for j in probas[:, :n_tags]]
-            tags = viterbi_our_crf(nodes, trans0, trans1, SPK_C['test'][i])
-            y_pred = y_pred + list(tags)
-            y_true = y_true + list(tag_lb.inverse_transform(Y['test'][i]))
+            tags = utlis.viterbi_our_crf(nodes, trans0, trans1, SPK_C['test'][i])
 
             corpus[test_set_idx[i]]['prediction'] = list(tags)
             corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
 
-        final_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+    ##########
 
-    print(final_accuracy)
+    y_true = []
+    y_pred = []
+    for conversation_id in test_set_idx:
+        y_true = y_true + corpus[conversation_id]['tag']
+        y_pred = y_pred + corpus[conversation_id]['prediction']
+    unigram_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+    labels = list(set(y_true))
+    matrix = confusion_matrix(y_pred=y_pred, y_true=y_true, labels=labels)
+    unigram_accuracy_per_label = sorted(zip(labels, matrix.diagonal() / matrix.sum(axis=1)), key=lambda x: x[1], reverse=True)
+
+    y_true = []
+    y_pred = []
+    for conversation_id in test_set_idx:
+        y_true = y_true + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['tag'], 2)]
+        y_pred = y_pred + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['prediction'], 2)]
+    bigram_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+    labels = list(set(y_true))
+    matrix = confusion_matrix(y_pred=y_pred, y_true=y_true, labels=labels)
+    bigram_accuracy_per_label = sorted(zip(labels, matrix.diagonal() / matrix.sum(axis=1)), key=lambda x: x[1], reverse=True)
+
+    y_true = []
+    y_pred = []
+    for conversation_id in test_set_idx:
+        y_true = y_true + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['tag'], 3)]
+        y_pred = y_pred + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['prediction'], 3)]
+    trigram_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+    labels = list(set(y_true))
+    matrix = confusion_matrix(y_pred=y_pred, y_true=y_true, labels=labels)
+    trigram_accuracy_per_label = sorted(zip(labels, matrix.diagonal() / matrix.sum(axis=1)), key=lambda x: x[1], reverse=True)
+
+    print(unigram_accuracy, bigram_accuracy, trigram_accuracy)
 
     pickle.dump({cid: corpus[cid] for cid in test_set_idx}, open(path_to_results + 'prediction.pkl', 'wb'))
+    with open(path_to_results+'unigram_accuracy_per_label.csv', 'w') as out:
+        csv_out = csv.writer(out)
+        for row in unigram_accuracy_per_label:
+            csv_out.writerow(row)
+    with open(path_to_results+'bigram_accuracy_per_label.csv', 'w') as out:
+        csv_out = csv.writer(out)
+        for row in bigram_accuracy_per_label:
+            csv_out.writerow(row)
+    with open(path_to_results+'trigram_accuracy_per_label.csv', 'w') as out:
+        csv_out = csv.writer(out)
+        for row in trigram_accuracy_per_label:
+            csv_out.writerow(row)
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('wv_dim', 'wv_epochs', 'corpus_name', 'swda_concatenate_interruption', 'mrda_tag_map', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'final_accuracy')))
+            dict(((k, eval(k)) for k in ('corpus_name', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'unigram_accuracy', 'bigram_accuracy', 'trigram_accuracy')))
         ))
+
     K.clear_session()

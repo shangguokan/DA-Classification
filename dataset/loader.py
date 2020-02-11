@@ -1,9 +1,23 @@
 import os
 import re
-import string
 from numpy import loadtxt
 from collections import defaultdict
 from dataset.swda.swda import CorpusReader
+from dataset import swda_split, mrda_split
+
+
+def get_splits(corpus_name):
+    if corpus_name == 'swda':
+        return swda_split.train_set_idx, swda_split.valid_set_idx, swda_split.test_set_idx
+    if corpus_name == 'mrda':
+        return mrda_split.train_set_idx, mrda_split.valid_set_idx, mrda_split.test_set_idx
+
+
+def load_corpus(corpus_name, conversation_list):
+    if corpus_name == 'swda':
+        return load_swda_corpus(conversation_list, concatenate_interruption=True)
+    if corpus_name == 'mrda':
+        return load_mrda_corpus(conversation_list, tag_map='basic')
 
 
 def load_mrda_corpus(conversation_list,
@@ -11,11 +25,6 @@ def load_mrda_corpus(conversation_list,
                      strip_punctuation=False,
                      tokenize_punctuation=True):
     """ Load MRDA corpus based on https://github.com/NathanDuran/MRDA-Corpus
-    :param conversation_list:
-    :param strip_punctuation:
-    :param tokenize_punctuation:
-    :param tag_map: basic, general, full.
-    :return:
     """
     corpus = defaultdict(lambda: defaultdict(list))
     tag_set = set()
@@ -64,12 +73,6 @@ def load_swda_corpus(conversation_list,
                      tokenize_punctuation=True,
                      do_lowercase=True):
     """ Load SwDA corpus based on https://github.com/cgpotts/swda
-    :param conversation_list:
-    :param strip_punctuation:
-    :param tokenize_punctuation:
-    :param concatenate_interruption:
-    :param do_lowercase:
-    :return:
     """
     corpus = defaultdict(lambda: defaultdict(list))
     tag_set = set()
@@ -117,9 +120,9 @@ def load_swda_corpus(conversation_list,
 
             sentence = sentence.split()
             if len(sentence) == 0:
-                continue
+                sentence = ['<non_verbal>']
             if len(sentence) == 1 and sentence[0] in '.,?!":':
-                continue
+                sentence = ['<non_verbal>'] + sentence
             sentence = ' '.join(sentence)
 
             utt_tag = utt.damsl_act_tag()

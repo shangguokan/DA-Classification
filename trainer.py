@@ -1,5 +1,5 @@
-from math import ceil
 import numpy as np
+from math import ceil
 from sklearn.utils import shuffle
 from keras.models import Model
 from keras.initializers import Constant
@@ -122,8 +122,9 @@ def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
     return model
 
 
-def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, epochs, batch_size, dropout_rate, mode, path_to_results):
-    n_hidden = word_embedding_matrix.shape[1]
+def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, mode, path_to_results):
+    epochs = 1
+    n_hidden = 300
     n_train_samples = len(X['train'])
     n_valid_samples = len(X['valid'])
 
@@ -134,7 +135,6 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
     input_X = Input(shape=(None, None), dtype='int32')
     s2v_module = get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate)
     output = TimeDistributed(s2v_module)(input_X)
-
 
     bilstm_layer = Bidirectional(
         LSTM(units=n_hidden,
@@ -149,17 +149,8 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
 
         model = Model(input_X, output)
-        model.summary()
         model.compile(optimizer='adam', loss=crf.loss, metrics=[])
 
-        history = model.fit_generator(
-            data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
-            steps_per_epoch=ceil(n_train_samples/batch_size),
-            epochs=epochs,
-            validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
-            validation_steps=ceil(n_valid_samples/batch_size),
-            callbacks=callbacks
-        )
     if mode == 'vanilla_crf-spk':
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
         dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
@@ -167,17 +158,8 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
 
         model = Model([input_X, input_SPK], output)
-        model.summary()
         model.compile(optimizer='adam', loss=crf.loss, metrics=[])
 
-        history = model.fit_generator(
-            data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
-            steps_per_epoch=ceil(n_train_samples/batch_size),
-            epochs=epochs,
-            validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
-            validation_steps=ceil(n_valid_samples/batch_size),
-            callbacks=callbacks
-        )
     if mode == 'our_crf-spk_c':
         input_SPK_C = Input(shape=(None,), dtype='int32')
         dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
@@ -185,19 +167,17 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
 
         model = Model([input_X, input_SPK_C], output)
-        model.summary()
         model.compile(optimizer='adam', loss=crf.loss_wrapper(input_SPK_C), metrics=[])
 
-        history = model.fit_generator(
-            data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
-            steps_per_epoch=ceil(n_train_samples/batch_size),
-            epochs=epochs,
-            validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
-            validation_steps=ceil(n_valid_samples/batch_size),
-            callbacks=callbacks
-        )
-    else:
-        pass
+    model.summary()
+    history = model.fit_generator(
+        data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
+        steps_per_epoch=ceil(n_train_samples/batch_size),
+        epochs=epochs,
+        validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
+        validation_steps=ceil(n_valid_samples/batch_size),
+        callbacks=callbacks
+    )
 
     return history.history, model
 
