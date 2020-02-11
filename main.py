@@ -22,7 +22,6 @@ corpus_name = 'swda'
 
 train_set_idx, valid_set_idx, test_set_idx = get_splits(corpus_name)
 conversation_list = train_set_idx + valid_set_idx + test_set_idx
-train_set_idx = train_set_idx[0:3]
 
 corpus, tag_set, speaker_set = load_corpus(corpus_name, conversation_list)
 

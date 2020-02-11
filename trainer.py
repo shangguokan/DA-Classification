@@ -123,7 +123,7 @@ def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
 
 
 def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, mode, path_to_results):
-    epochs = 1
+    epochs = 100
     n_hidden = 300
     n_train_samples = len(X['train'])
     n_valid_samples = len(X['valid'])
