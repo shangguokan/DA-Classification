@@ -153,9 +153,10 @@ for param in ParameterGrid(param_grid):
         y_true = y_true + corpus[conversation_id]['tag']
         y_pred = y_pred + corpus[conversation_id]['prediction']
     unigram_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
-    labels = list(set(y_true))
+    labels = list(set(y_true)|set(y_pred))
     matrix = confusion_matrix(y_pred=y_pred, y_true=y_true, labels=labels)
-    unigram_accuracy_per_label = sorted(zip(labels, matrix.diagonal() / matrix.sum(axis=1)), key=lambda x: x[1], reverse=True)
+    unigram_accuracy_per_label = sorted(zip(labels, np.nan_to_num(matrix.diagonal() / matrix.sum(axis=1)), matrix.diagonal(), matrix.sum(axis=1)),
+                                        key=lambda x: x[1], reverse=True)
 
     y_true = []
     y_pred = []
@@ -163,9 +164,10 @@ for param in ParameterGrid(param_grid):
         y_true = y_true + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['tag'], 2)]
         y_pred = y_pred + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['prediction'], 2)]
     bigram_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
-    labels = list(set(y_true))
+    labels = list(set(y_true) | set(y_pred))
     matrix = confusion_matrix(y_pred=y_pred, y_true=y_true, labels=labels)
-    bigram_accuracy_per_label = sorted(zip(labels, matrix.diagonal() / matrix.sum(axis=1)), key=lambda x: x[1], reverse=True)
+    bigram_accuracy_per_label = sorted(zip(labels, np.nan_to_num(matrix.diagonal() / matrix.sum(axis=1)), matrix.diagonal(), matrix.sum(axis=1)),
+                                       key=lambda x: x[1], reverse=True)
 
     y_true = []
     y_pred = []
@@ -173,9 +175,10 @@ for param in ParameterGrid(param_grid):
         y_true = y_true + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['tag'], 3)]
         y_pred = y_pred + ['->'.join(gram) for gram in ngrams(corpus[conversation_id]['prediction'], 3)]
     trigram_accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
-    labels = list(set(y_true))
+    labels = list(set(y_true) | set(y_pred))
     matrix = confusion_matrix(y_pred=y_pred, y_true=y_true, labels=labels)
-    trigram_accuracy_per_label = sorted(zip(labels, matrix.diagonal() / matrix.sum(axis=1)), key=lambda x: x[1], reverse=True)
+    trigram_accuracy_per_label = sorted(zip(labels, np.nan_to_num(matrix.diagonal() / matrix.sum(axis=1)), matrix.diagonal(), matrix.sum(axis=1)),
+                                        key=lambda x: x[1], reverse=True)
 
     print(unigram_accuracy, bigram_accuracy, trigram_accuracy)
 
