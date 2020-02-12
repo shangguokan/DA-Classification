@@ -136,7 +136,7 @@ def load_swda_corpus(conversation_list,
             else:
                 for i in reversed(range(len(corpus[conversation_id]['tag']))):
                     if corpus[conversation_id]['speaker'][i] == utt.caller:
-                        corpus[conversation_id]['sentence'][i] += ' '+sentence
+                        corpus[conversation_id]['sentence'][i] += ' <CONNECTOR> '+sentence
                         break
 
     return corpus, tag_set, speaker_set

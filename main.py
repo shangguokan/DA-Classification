@@ -28,13 +28,13 @@ corpus, tag_set, speaker_set = load_corpus(corpus_name, conversation_list)
 if os.path.isfile('resource/vocabulary-'+corpus_name+'.txt'):
     vocabulary = open('resource/vocabulary-'+corpus_name+'.txt', 'r').read().splitlines()
 else:
-    train_val_sentences = [
-        sentence.split() for conversation_id in train_set_idx + valid_set_idx
+    train_sentences = [
+        sentence.split() for conversation_id in train_set_idx
         for sentence in corpus[conversation_id]['sentence']
     ]
     vocabulary = utlis.train_and_save_word2vec(
         corpus_name,
-        train_val_sentences,
+        train_sentences,
         wv_dim=300,
         wv_epochs=30
     )
@@ -73,7 +73,7 @@ for key, value in zip(['train', 'valid', 'test'], [train_set_idx, valid_set_idx,
 
 param_grid = {
     'encoder_type': ['lstm'],  # lstm, bilstm, att-bilstm
-    'mode': ['vanilla_crf', 'vanilla_crf-spk', 'our_crf-spk_c'],
+    'mode': ['our_crf-spk_c', 'vanilla_crf', 'vanilla_crf-spk'],
     'batch_size': [1],
     'dropout_rate': [0.2],
 }
