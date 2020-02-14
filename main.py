@@ -76,6 +76,7 @@ param_grid = {
     'mode': ['our_crf-spk_c', 'vanilla_crf', 'vanilla_crf-spk'],
     'batch_size': [1],
     'dropout_rate': [0.2],
+    'crf_lr_multiplier': [1]
 }
 
 for param in ParameterGrid(param_grid):
@@ -83,6 +84,7 @@ for param in ParameterGrid(param_grid):
     mode = param['mode']
     batch_size = param['batch_size']
     dropout_rate = param['dropout_rate']
+    crf_lr_multiplier = param['crf_lr_multiplier']
 
     f_id = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(5))
     path_to_results = 'results/' + str(datetime.now()).replace(' ', '_').split('.')[0] + '_' + f_id + '/'
@@ -91,7 +93,7 @@ for param in ParameterGrid(param_grid):
 
     n_tags = len(tag_lb.classes_)
     n_spks = len(spk_lb.classes_)
-    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, mode, path_to_results)
+    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, crf_lr_multiplier, mode, path_to_results)
     utlis.save_and_plot_history(history, path_to_results)
 
     ##########
@@ -198,7 +200,7 @@ for param in ParameterGrid(param_grid):
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('corpus_name', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'best_epoch', 'val_loss', 'test_loss', 'unigram_accuracy', 'bigram_accuracy', 'trigram_accuracy')))
+            dict(((k, eval(k)) for k in ('corpus_name', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'crf_lr_multiplier', 'best_epoch', 'val_loss', 'test_loss', 'unigram_accuracy', 'bigram_accuracy', 'trigram_accuracy')))
         ))
 
     K.clear_session()

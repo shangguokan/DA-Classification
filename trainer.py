@@ -10,7 +10,7 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from vanilla_crf import VanillaCRF
 from our_crf import OurCRF
 from attention_with_context import AttentionWithContext
-
+from keras_lr_multiplier import LRMultiplier
 
 def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
     n_samples = len(X[set_name])
@@ -122,7 +122,7 @@ def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
     return model
 
 
-def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, mode, path_to_results):
+def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, crf_lr_multiplier, mode, path_to_results):
     epochs = 100
     n_hidden = 300
     n_train_samples = len(X['train'])
@@ -149,7 +149,7 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
 
         model = Model(input_X, output)
-        model.compile(optimizer='adam', loss=crf.loss, metrics=[])
+        model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
 
     if mode == 'vanilla_crf-spk':
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
@@ -158,7 +158,7 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
 
         model = Model([input_X, input_SPK], output)
-        model.compile(optimizer='adam', loss=crf.loss, metrics=[])
+        model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
 
     if mode == 'our_crf-spk_c':
         input_SPK_C = Input(shape=(None,), dtype='int32')
@@ -167,7 +167,7 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
 
         model = Model([input_X, input_SPK_C], output)
-        model.compile(optimizer='adam', loss=crf.loss_wrapper(input_SPK_C), metrics=[])
+        model.compile(optimizer=LRMultiplier('adam', {'our_crf': crf_lr_multiplier}), loss=crf.loss_wrapper(input_SPK_C), metrics=[])
 
     model.summary()
     history = model.fit_generator(
