@@ -67,6 +67,12 @@ def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
                 if mode == 'vanilla_crf-spk':
                     yield ([np.array(B_X), np.array(B_SPK)],
                            np.array(B_Y))
+                if mode == 'vanilla_crf-spk_c':
+                    B_SPK_C = np.array(B_SPK_C)
+                    pad = np.ones((B_SPK_C.shape[0], 1))
+                    B_SPK_C = np.concatenate([pad, B_SPK_C], axis=-1)
+                    yield ([np.array(B_X), np.expand_dims(B_SPK_C, axis=-1)],
+                           np.array(B_Y))
                 if mode == 'our_crf-spk_c':
                     yield ([np.array(B_X), np.array(B_SPK_C)],
                            np.array(B_Y))
@@ -158,6 +164,15 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
         output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
 
         model = Model([input_X, input_SPK], output)
+        model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
+
+    if mode == 'vanilla_crf-spk_c':
+        input_SPK_C = Input(shape=(None, 1), dtype='float32')
+        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
+        crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
+        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK_C, output])))))
+
+        model = Model([input_X, input_SPK_C], output)
         model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
 
     if mode == 'our_crf-spk_c':
