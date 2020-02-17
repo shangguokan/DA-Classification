@@ -7,8 +7,8 @@ from keras.constraints import UnitNorm
 from keras.layers import Input, Dense, Embedding, LSTM, Dropout
 from keras.layers import TimeDistributed, Bidirectional, concatenate
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from vanilla_crf import VanillaCRF
-from our_crf import OurCRF
+from vanilla_crf import VanillaCRF, ViterbiAccuracy_VanillaCRF
+from our_crf import OurCRF, ViterbiAccuracy_OurCRF
 from attention_with_context import AttentionWithContext
 from keras_lr_multiplier import LRMultiplier
 
@@ -128,15 +128,18 @@ def get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate):
     return model
 
 
-def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, crf_lr_multiplier, mode, path_to_results):
+def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, tag_lb, n_tags, n_spks, batch_size, dropout_rate, crf_lr_multiplier, mode, path_to_results):
     epochs = 100
     n_hidden = 300
     n_train_samples = len(X['train'])
     n_valid_samples = len(X['valid'])
+    validation_data = data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size)
+    validation_steps = ceil(n_valid_samples / batch_size)
+
 
     callbacks = [ModelCheckpoint(filepath=path_to_results+'model_on_epoch_end/'+'{epoch}.h5',
                                  save_weights_only=True),
-                 EarlyStopping(monitor='val_loss', patience=5)]
+                 EarlyStopping(monitor='val_viterbi_accuracy', patience=5)]
 
     input_X = Input(shape=(None, None), dtype='int32')
     s2v_module = get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate)
@@ -156,6 +159,7 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
 
         model = Model(input_X, output)
         model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
+        metric_callback = ViterbiAccuracy_VanillaCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
 
     if mode == 'vanilla_crf-spk':
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
@@ -165,6 +169,7 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
 
         model = Model([input_X, input_SPK], output)
         model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
+        metric_callback = ViterbiAccuracy_VanillaCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
 
     if mode == 'vanilla_crf-spk_c':
         input_SPK_C = Input(shape=(None, 1), dtype='float32')
@@ -174,6 +179,7 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
 
         model = Model([input_X, input_SPK_C], output)
         model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
+        metric_callback = ViterbiAccuracy_VanillaCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
 
     if mode == 'our_crf-spk_c':
         input_SPK_C = Input(shape=(None,), dtype='int32')
@@ -183,14 +189,16 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks,
 
         model = Model([input_X, input_SPK_C], output)
         model.compile(optimizer=LRMultiplier('adam', {'our_crf': crf_lr_multiplier}), loss=crf.loss_wrapper(input_SPK_C), metrics=[])
+        metric_callback = ViterbiAccuracy_OurCRF(validation_data, validation_steps, tag_lb, n_tags)
 
     model.summary()
+    callbacks = [metric_callback] + callbacks
     history = model.fit_generator(
         data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
         steps_per_epoch=ceil(n_train_samples/batch_size),
         epochs=epochs,
-        validation_data=data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size),
-        validation_steps=ceil(n_valid_samples/batch_size),
+        validation_data=validation_data,
+        validation_steps=validation_steps,
         callbacks=callbacks
     )
 

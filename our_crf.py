@@ -1,8 +1,10 @@
 # -*- coding:utf-8 -*-
-
+import utlis
+import numpy as np
 import keras.backend as K
 from keras.layers import Layer
-
+from keras.callbacks import Callback
+from sklearn.metrics import accuracy_score
 
 class OurCRF(Layer):
     def __init__(self, ignore_last_label=False, **kwargs):
@@ -79,3 +81,35 @@ class OurCRF(Layer):
             return K.sum(isequal*mask) / K.sum(mask)
 
 
+class ViterbiAccuracy_OurCRF(Callback):
+    def __init__(self, validation_data, validation_steps, tag_lb, n_tags):
+        super().__init__()
+        self.validation_data = validation_data
+        self.validation_steps = validation_steps
+        self.tag_lb = tag_lb
+        self.n_tags = n_tags
+
+    def on_epoch_end(self, epoch, logs={}):
+        trans0, trans1 = {}, {}
+        for i in range(self.n_tags):
+            for j in range(self.n_tags):
+                tag_from = self.tag_lb.classes_[i]
+                tag_to = self.tag_lb.classes_[j]
+                trans0[(tag_from, tag_to)] = self.model.get_layer('our_crf_1').get_weights()[0][i, j]
+                trans1[(tag_from, tag_to)] = self.model.get_layer('our_crf_1').get_weights()[1][i, j]
+
+        y_pred, y_true = [], []
+        for _ in range(self.validation_steps):
+            [B_X, B_SPK_C], B_Y = next(self.validation_data)
+            for i in range(len(B_X)):
+                probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]])])[0]
+                nodes = [dict(zip(self.tag_lb.classes_, j)) for j in probas[:, :self.n_tags]]
+                tags = utlis.viterbi_our_crf(nodes, trans0, trans1, B_SPK_C[i])
+
+                y_pred = y_pred + list(tags)
+                y_true = y_true + list(self.tag_lb.inverse_transform(B_Y[i]))
+
+        accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+        print('val_viterbi_accuracy', accuracy)
+
+        logs['val_viterbi_accuracy'] = accuracy

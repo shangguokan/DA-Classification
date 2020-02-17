@@ -93,16 +93,16 @@ for param in ParameterGrid(param_grid):
 
     n_tags = len(tag_lb.classes_)
     n_spks = len(spk_lb.classes_)
-    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, n_tags, n_spks, batch_size, dropout_rate, crf_lr_multiplier, mode, path_to_results)
+    history, model = trainer.train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, tag_lb, n_tags, n_spks, batch_size, dropout_rate, crf_lr_multiplier, mode, path_to_results)
     utlis.save_and_plot_history(history, path_to_results)
 
     ##########
 
-    val_loss_list = np.array(history['val_loss'])
-    best_epoch = int(np.where(val_loss_list == val_loss_list.min())[0][-1] + 1)
-    val_loss = val_loss_list[best_epoch-1]
+    val_viterbi_accuracy_list = np.array(history['val_viterbi_accuracy'])
+    best_epoch = int(np.where(val_viterbi_accuracy_list == val_viterbi_accuracy_list.max())[0][-1] + 1)
+    val_loss = np.array(history['val_loss'])[best_epoch-1]
 
-    print('the best epoch based on val_loss:', best_epoch)
+    print('the best epoch based on val_viterbi_accuracy:', best_epoch)
     model.load_weights(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
     n_test_samples = len(X['test'])
     test_loss = model.evaluate_generator(

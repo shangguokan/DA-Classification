@@ -1,8 +1,10 @@
 # -*- coding:utf-8 -*-
-
+import utlis
+import numpy as np
 import keras.backend as K
 from keras.layers import Layer
-
+from keras.callbacks import Callback
+from sklearn.metrics import accuracy_score
 
 class VanillaCRF(Layer):
     """纯Keras实现CRF层
@@ -66,3 +68,49 @@ class VanillaCRF(Layer):
             return K.mean(isequal)
         else:
             return K.sum(isequal*mask) / K.sum(mask)
+
+
+class ViterbiAccuracy_VanillaCRF(Callback):
+    def __init__(self, validation_data, validation_steps, tag_lb, n_tags, mode):
+        super().__init__()
+        self.validation_data = validation_data
+        self.validation_steps = validation_steps
+        self.tag_lb = tag_lb
+        self.n_tags = n_tags
+        self.mode = mode
+
+    def on_epoch_end(self, epoch, logs={}):
+        trans = {}
+        for i in range(self.n_tags):
+            for j in range(self.n_tags):
+                tag_from = self.tag_lb.classes_[i]
+                tag_to = self.tag_lb.classes_[j]
+                trans[(tag_from, tag_to)] = self.model.get_layer('vanilla_crf_1').get_weights()[0][i, j]
+
+        y_pred, y_true = [], []
+        for _ in range(self.validation_steps):
+            if self.mode == 'vanilla_crf':
+                B_X, B_Y = next(self.validation_data)
+            if self.mode == 'vanilla_crf-spk':
+                [B_X, B_SPK], B_Y = next(self.validation_data)
+            if self.mode == 'vanilla_crf-spk_c':
+                [B_X, B_SPK_C], B_Y = next(self.validation_data)
+
+            for i in range(len(B_X)):
+                if self.mode == 'vanilla_crf':
+                    probas = self.model.predict(np.array([B_X[i]]))[0]
+                if self.mode == 'vanilla_crf-spk':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK[i]])])[0]
+                if self.mode == 'vanilla_crf-spk_c':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]])])[0]
+
+                nodes = [dict(zip(self.tag_lb.classes_, j)) for j in probas[:, :self.n_tags]]
+                tags = utlis.viterbi_vanilla_crf(nodes, trans)
+
+                y_pred = y_pred + list(tags)
+                y_true = y_true + list(self.tag_lb.inverse_transform(B_Y[i]))
+
+        accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+        print('val_viterbi_accuracy', accuracy)
+
+        logs['val_viterbi_accuracy'] = accuracy
