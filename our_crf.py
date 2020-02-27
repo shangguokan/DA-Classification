@@ -27,6 +27,10 @@ class OurCRF(Layer):
                                      shape=(self.num_labels, self.num_labels),
                                      initializer='zeros',
                                      trainable=False)
+        self.transb = self.add_weight(name='crf_transb',
+                                     shape=(self.num_labels, self.num_labels),
+                                     initializer='glorot_uniform',
+                                     trainable=True)
 
     def log_norm_step(self, inputs, states):
         """递归计算归一化因子
@@ -38,7 +42,7 @@ class OurCRF(Layer):
 
         states = K.expand_dims(states[0], 2) # (batch_size, output_dim, 1)
         # trans = K.expand_dims(self.trans, 0) # (1, output_dim, output_dim)
-        trans = K.gather(K.stack([self.trans0, self.trans1, self.trans2]), spk_change)
+        trans = K.gather(K.stack([self.trans0+self.transb, self.trans1+self.transb, self.trans2]), spk_change)
         output = K.logsumexp(states+trans, 1) # (batch_size, output_dim)
         return output+inputs, [output+inputs, K.concatenate([spk_change_sequence[:, 1:], spk_change_sequence[:, 0:1]])]
 
@@ -52,7 +56,7 @@ class OurCRF(Layer):
         labels2 = K.expand_dims(labels[:, 1:], 2)
         labels = labels1 * labels2 # 两个错位labels，负责从转移矩阵中抽取目标转移得分
         # trans = K.expand_dims(K.expand_dims(self.trans, 0), 0)
-        trans = K.gather(K.stack([self.trans0, self.trans1, self.trans2]), spk_change_sequence)
+        trans = K.gather(K.stack([self.trans0+self.transb, self.trans1+self.transb, self.trans2]), spk_change_sequence)
         trans_score = K.sum(K.sum(trans*labels, [2,3]), 1, keepdims=True)
         return point_score+trans_score # 两部分得分之和
 
@@ -97,6 +101,9 @@ class ViterbiAccuracy_OurCRF(Callback):
                 tag_to = self.tag_lb.classes_[j]
                 trans0[(tag_from, tag_to)] = self.model.get_layer('our_crf_1').get_weights()[0][i, j]
                 trans1[(tag_from, tag_to)] = self.model.get_layer('our_crf_1').get_weights()[1][i, j]
+
+                trans0[(tag_from, tag_to)] += self.model.get_layer('our_crf_1').get_weights()[3][i, j]
+                trans1[(tag_from, tag_to)] += self.model.get_layer('our_crf_1').get_weights()[3][i, j]
 
         y_pred, y_true = [], []
         for _ in range(self.validation_steps):

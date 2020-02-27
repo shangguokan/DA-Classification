@@ -95,7 +95,7 @@ def load_history(path_to_results):
 def save_trans_to_csv(weights, header, corpus_name, path_to_results):
     for idx, trans in enumerate(weights):
         if idx == 2:
-            break
+            continue
 
         df = pd.DataFrame(
             trans,
