@@ -23,14 +23,14 @@ class OurCRF(Layer):
                                      shape=(self.num_labels, self.num_labels),
                                      initializer='glorot_uniform',
                                      trainable=True)
-        self.trans2 = self.add_weight(name='crf_trans2',
-                                     shape=(self.num_labels, self.num_labels),
-                                     initializer='zeros',
-                                     trainable=False)
         self.transb = self.add_weight(name='crf_transb',
                                      shape=(self.num_labels, self.num_labels),
                                      initializer='glorot_uniform',
                                      trainable=True)
+        self.trans2 = self.add_weight(name='crf_trans2',
+                                     shape=(self.num_labels, self.num_labels),
+                                     initializer='zeros',
+                                     trainable=False)
 
     def log_norm_step(self, inputs, states):
         """递归计算归一化因子
@@ -102,8 +102,8 @@ class ViterbiAccuracy_OurCRF(Callback):
                 trans0[(tag_from, tag_to)] = self.model.get_layer('our_crf_1').get_weights()[0][i, j]
                 trans1[(tag_from, tag_to)] = self.model.get_layer('our_crf_1').get_weights()[1][i, j]
 
-                trans0[(tag_from, tag_to)] += self.model.get_layer('our_crf_1').get_weights()[3][i, j]
-                trans1[(tag_from, tag_to)] += self.model.get_layer('our_crf_1').get_weights()[3][i, j]
+                trans0[(tag_from, tag_to)] += self.model.get_layer('our_crf_1').get_weights()[2][i, j]
+                trans1[(tag_from, tag_to)] += self.model.get_layer('our_crf_1').get_weights()[2][i, j]
 
         y_pred, y_true = [], []
         for _ in range(self.validation_steps):

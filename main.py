@@ -141,8 +141,8 @@ for param in ParameterGrid(param_grid):
                 trans0[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[0][i, j]
                 trans1[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[1][i, j]
 
-                trans0[(tag_from, tag_to)] += model.get_layer('our_crf_1').get_weights()[3][i, j]
-                trans1[(tag_from, tag_to)] += model.get_layer('our_crf_1').get_weights()[3][i, j]
+                trans0[(tag_from, tag_to)] += model.get_layer('our_crf_1').get_weights()[2][i, j]
+                trans1[(tag_from, tag_to)] += model.get_layer('our_crf_1').get_weights()[2][i, j]
         utlis.save_trans_to_csv(model.get_layer('our_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
 
         for i in range(n_test_samples):
