@@ -7,10 +7,9 @@ from keras.constraints import UnitNorm
 from keras.layers import Input, Dense, Embedding, LSTM, Dropout
 from keras.layers import TimeDistributed, Bidirectional, concatenate
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from vanilla_crf import VanillaCRF, ViterbiAccuracy_VanillaCRF
-from our_crf import OurCRF, ViterbiAccuracy_OurCRF
 from attention_with_context import AttentionWithContext
-from keras_lr_multiplier import LRMultiplier
+from keras.callbacks import Callback
+from sklearn.metrics import accuracy_score
 
 def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
     n_samples = len(X[set_name])
@@ -136,10 +135,9 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, tag_lb, n_tags,
     validation_data = data_generator('valid', X, Y, SPK, SPK_C, mode, batch_size)
     validation_steps = ceil(n_valid_samples / batch_size)
 
-
     callbacks = [ModelCheckpoint(filepath=path_to_results+'model_on_epoch_end/'+'{epoch}.h5',
                                  save_weights_only=True),
-                 EarlyStopping(monitor='val_viterbi_accuracy', patience=5)]
+                 EarlyStopping(monitor='val_acc', patience=5)]
 
     input_X = Input(shape=(None, None), dtype='int32')
     s2v_module = get_s2v_module(encoder_type, word_embedding_matrix, n_hidden, dropout_rate)
@@ -153,45 +151,30 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, tag_lb, n_tags,
     dropout_layer = Dropout(dropout_rate)
 
     if mode == 'vanilla_crf':
-        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
-        crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
+        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1, activation='softmax')
+        output = dense_layer(dropout_layer(bilstm_layer(output)))
 
         model = Model(input_X, output)
-        model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
-        metric_callback = ViterbiAccuracy_VanillaCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=[])
 
     if mode == 'vanilla_crf-spk':
         input_SPK = Input(shape=(None, n_spks), dtype='float32')
-        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
-        crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
+        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1, activation='softmax')
+        output = dense_layer(dropout_layer(bilstm_layer(concatenate([input_SPK, output]))))
 
         model = Model([input_X, input_SPK], output)
-        model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
-        metric_callback = ViterbiAccuracy_VanillaCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=[])
 
     if mode == 'vanilla_crf-spk_c':
         input_SPK_C = Input(shape=(None, 1), dtype='float32')
-        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags+1)
-        crf = VanillaCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK_C, output])))))
+        dense_layer = Dense(units=n_tags if batch_size == 1 else n_tags+1, activation='softmax')
+        output = dense_layer(dropout_layer(bilstm_layer(concatenate([input_SPK_C, output]))))
 
         model = Model([input_X, input_SPK_C], output)
-        model.compile(optimizer=LRMultiplier('adam', {'vanilla_crf': crf_lr_multiplier}), loss=crf.loss, metrics=[])
-        metric_callback = ViterbiAccuracy_VanillaCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
-
-    if mode == 'our_crf-spk_c':
-        input_SPK_C = Input(shape=(None,), dtype='int32')
-        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
-        crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
-        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(output))))
-
-        model = Model([input_X, input_SPK_C], output)
-        model.compile(optimizer=LRMultiplier('adam', {'our_crf': crf_lr_multiplier}), loss=crf.loss_wrapper(input_SPK_C), metrics=[])
-        metric_callback = ViterbiAccuracy_OurCRF(validation_data, validation_steps, tag_lb, n_tags)
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=[])
 
     model.summary()
+    metric_callback = CustomAccuracy(validation_data, validation_steps, tag_lb, n_tags, mode)
     callbacks = [metric_callback] + callbacks
     history = model.fit_generator(
         data_generator('train', X, Y, SPK, SPK_C, mode, batch_size),
@@ -205,3 +188,37 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, tag_lb, n_tags,
     return history.history, model
 
 
+class CustomAccuracy(Callback):
+    def __init__(self, validation_data, validation_steps, tag_lb, n_tags, mode):
+        super().__init__()
+        self.validation_data = validation_data
+        self.validation_steps = validation_steps
+        self.tag_lb = tag_lb
+        self.n_tags = n_tags
+        self.mode = mode
+
+    def on_epoch_end(self, epoch, logs={}):
+        y_pred, y_true = [], []
+        for _ in range(self.validation_steps):
+            if self.mode == 'vanilla_crf':
+                B_X, B_Y = next(self.validation_data)
+            if self.mode == 'vanilla_crf-spk':
+                [B_X, B_SPK], B_Y = next(self.validation_data)
+            if self.mode == 'vanilla_crf-spk_c':
+                [B_X, B_SPK_C], B_Y = next(self.validation_data)
+
+            for i in range(len(B_X)):
+                if self.mode == 'vanilla_crf':
+                    probas = self.model.predict(np.array([B_X[i]]))[0]
+                if self.mode == 'vanilla_crf-spk':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK[i]])])[0]
+                if self.mode == 'vanilla_crf-spk_c':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]])])[0]
+
+                y_pred = y_pred + list(self.tag_lb.classes_[np.argmax(probas, axis=1)])
+                y_true = y_true + list(self.tag_lb.inverse_transform(B_Y[i]))
+
+        accuracy = accuracy_score(y_pred=y_pred, y_true=y_true)
+        print('val_custom_accuracy', accuracy)
+
+        logs['val_custom_accuracy'] = accuracy

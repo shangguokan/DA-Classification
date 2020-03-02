@@ -73,7 +73,7 @@ for key, value in zip(['train', 'valid', 'test'], [train_set_idx, valid_set_idx,
 
 param_grid = {
     'encoder_type': ['lstm'],  # lstm, bilstm, att-bilstm
-    'mode': ['our_crf-spk_c', 'vanilla_crf', 'vanilla_crf-spk', 'vanilla_crf-spk_c'],
+    'mode': ['vanilla_crf', 'vanilla_crf-spk', 'vanilla_crf-spk_c'],
     'batch_size': [1],
     'dropout_rate': [0.2],
     'crf_lr_multiplier': [1]
@@ -98,57 +98,29 @@ for param in ParameterGrid(param_grid):
 
     ##########
 
-    val_viterbi_accuracy_list = np.array(history['val_viterbi_accuracy'])
-    best_epoch = int(np.where(val_viterbi_accuracy_list == val_viterbi_accuracy_list.max())[0][-1] + 1)
+    val_accuracy_list = np.array(history['val_custom_accuracy'])
+    best_epoch = int(np.where(val_accuracy_list == val_accuracy_list.max())[0][-1] + 1)
     val_loss = np.array(history['val_loss'])[best_epoch-1]
 
-    print('the best epoch based on val_viterbi_accuracy:', best_epoch)
+    print('the best epoch based on val_custom_accuracy:', best_epoch)
     model.load_weights(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
     n_test_samples = len(X['test'])
     test_loss = model.evaluate_generator(
         trainer.data_generator('test', X, Y, SPK, SPK_C, mode, batch_size),
         steps=ceil(n_test_samples/batch_size))
+    print(test_loss)
 
-    if mode == 'vanilla_crf' or mode == 'vanilla_crf-spk' or mode == 'vanilla_crf-spk_c':
-        trans = {}
-        for i in range(n_tags):
-            for j in range(n_tags):
-                tag_from = tag_lb.classes_[i]
-                tag_to = tag_lb.classes_[j]
-                trans[(tag_from, tag_to)] = model.get_layer('vanilla_crf_1').get_weights()[0][i, j]
-        utlis.save_trans_to_csv(model.get_layer('vanilla_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
+    for i in range(n_test_samples):
+        if mode == 'vanilla_crf':
+            probas = model.predict(np.array([X['test'][i]]))[0]
+        if mode == 'vanilla_crf-spk':
+            probas = model.predict([np.array([X['test'][i]]), np.array([SPK['test'][i]])])[0]
+        if mode == 'vanilla_crf-spk_c':
+            probas = model.predict([np.array([X['test'][i]]), np.expand_dims(np.array([
+                np.concatenate([[1], SPK_C['test'][i]])]), axis=-1)])[0]
 
-        for i in range(n_test_samples):
-            if mode == 'vanilla_crf':
-                probas = model.predict(np.array([X['test'][i]]))[0]
-            if mode == 'vanilla_crf-spk':
-                probas = model.predict([np.array([X['test'][i]]), np.array([SPK['test'][i]])])[0]
-            if mode == 'vanilla_crf-spk_c':
-                probas = model.predict([np.array([X['test'][i]]), np.expand_dims(np.array([
-                    np.concatenate([[1], SPK_C['test'][i]])]), axis=-1)])[0]
-            nodes = [dict(zip(tag_lb.classes_, j)) for j in probas[:, :n_tags]]
-            tags = utlis.viterbi_vanilla_crf(nodes, trans)
-
-            corpus[test_set_idx[i]]['prediction'] = list(tags)
-            corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
-
-    if mode == 'our_crf-spk_c':
-        trans0, trans1 = {}, {}
-        for i in range(n_tags):
-            for j in range(n_tags):
-                tag_from = tag_lb.classes_[i]
-                tag_to = tag_lb.classes_[j]
-                trans0[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[0][i, j]
-                trans1[(tag_from, tag_to)] = model.get_layer('our_crf_1').get_weights()[1][i, j]
-        utlis.save_trans_to_csv(model.get_layer('our_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
-
-        for i in range(n_test_samples):
-            probas = model.predict([np.array([X['test'][i]]), np.array([SPK_C['test'][i]])])[0]
-            nodes = [dict(zip(tag_lb.classes_, j)) for j in probas[:, :n_tags]]
-            tags = utlis.viterbi_our_crf(nodes, trans0, trans1, SPK_C['test'][i])
-
-            corpus[test_set_idx[i]]['prediction'] = list(tags)
-            corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
+        corpus[test_set_idx[i]]['prediction'] = list(tag_lb.classes_[np.argmax(probas, axis=1)])
+        corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
 
     ##########
 
