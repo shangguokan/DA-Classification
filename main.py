@@ -73,7 +73,7 @@ for key, value in zip(['train', 'valid', 'test'], [train_set_idx, valid_set_idx,
 
 param_grid = {
     'encoder_type': ['lstm'],  # lstm, bilstm, att-bilstm
-    'mode': ['our_crf-spk_c', 'vanilla_crf', 'vanilla_crf-spk', 'vanilla_crf-spk_c'],
+    'mode': ['our_crf-spk_c-spk_c', 'our_crf-spk_c-spk'],
     'batch_size': [1],
     'dropout_rate': [0.2],
     'crf_lr_multiplier': [1]
@@ -132,7 +132,7 @@ for param in ParameterGrid(param_grid):
             corpus[test_set_idx[i]]['prediction'] = list(tags)
             corpus[test_set_idx[i]]['tag'] = list(tag_lb.inverse_transform(Y['test'][i]))
 
-    if mode == 'our_crf-spk_c':
+    if mode == 'our_crf-spk_c' or mode == 'our_crf-spk_c-spk_c' or mode == 'our_crf-spk_c-spk':
         trans0, trans1 = {}, {}
         for i in range(n_tags):
             for j in range(n_tags):
@@ -143,7 +143,13 @@ for param in ParameterGrid(param_grid):
         utlis.save_trans_to_csv(model.get_layer('our_crf_1').get_weights(), tag_lb.classes_, corpus_name, path_to_results)
 
         for i in range(n_test_samples):
-            probas = model.predict([np.array([X['test'][i]]), np.array([SPK_C['test'][i]])])[0]
+            if mode == 'our_crf-spk_c':
+                probas = model.predict([np.array([X['test'][i]]), np.array([SPK_C['test'][i]])])[0]
+            if mode == 'our_crf-spk_c-spk_c':
+                probas = model.predict([np.array([X['test'][i]]), np.array([SPK_C['test'][i]]), np.expand_dims(np.array([np.concatenate([[1], SPK_C['test'][i]])]), axis=-1)])[0]
+            if mode == 'our_crf-spk_c-spk':
+                probas = model.predict([np.array([X['test'][i]]), np.array([SPK_C['test'][i]]), np.array([SPK['test'][i]])])[0]
+
             nodes = [dict(zip(tag_lb.classes_, j)) for j in probas[:, :n_tags]]
             tags = utlis.viterbi_our_crf(nodes, trans0, trans1, SPK_C['test'][i])
 

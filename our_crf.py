@@ -82,12 +82,13 @@ class OurCRF(Layer):
 
 
 class ViterbiAccuracy_OurCRF(Callback):
-    def __init__(self, validation_data, validation_steps, tag_lb, n_tags):
+    def __init__(self, validation_data, validation_steps, tag_lb, n_tags, mode):
         super().__init__()
         self.validation_data = validation_data
         self.validation_steps = validation_steps
         self.tag_lb = tag_lb
         self.n_tags = n_tags
+        self.mode = mode
 
     def on_epoch_end(self, epoch, logs={}):
         trans0, trans1 = {}, {}
@@ -100,9 +101,20 @@ class ViterbiAccuracy_OurCRF(Callback):
 
         y_pred, y_true = [], []
         for _ in range(self.validation_steps):
-            [B_X, B_SPK_C], B_Y = next(self.validation_data)
+            if self.mode == 'our_crf-spk_c':
+                [B_X, B_SPK_C], B_Y = next(self.validation_data)
+            if self.mode == 'our_crf-spk_c-spk_c':
+                [B_X, B_SPK_C, B_SPK_CC], B_Y = next(self.validation_data)
+            if self.mode == 'our_crf-spk_c-spk':
+                [B_X, B_SPK_C, B_SPK], B_Y = next(self.validation_data)
             for i in range(len(B_X)):
-                probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]])])[0]
+                if self.mode == 'our_crf-spk_c':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]])])[0]
+                if self.mode == 'our_crf-spk_c-spk_c':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]]), np.array([B_SPK_CC[i]])])[0]
+                if self.mode == 'our_crf-spk_c-spk':
+                    probas = self.model.predict([np.array([B_X[i]]), np.array([B_SPK_C[i]]), np.array([B_SPK[i]])])[0]
+
                 nodes = [dict(zip(self.tag_lb.classes_, j)) for j in probas[:, :self.n_tags]]
                 tags = utlis.viterbi_our_crf(nodes, trans0, trans1, B_SPK_C[i])
 

@@ -76,6 +76,15 @@ def data_generator(set_name, X, Y, SPK, SPK_C, mode, batch_size):
                 if mode == 'our_crf-spk_c':
                     yield ([np.array(B_X), np.array(B_SPK_C)],
                            np.array(B_Y))
+                if mode == 'our_crf-spk_c-spk_c':
+                    B_SPK_CC = np.array(B_SPK_C)
+                    pad = np.ones((B_SPK_CC.shape[0], 1))
+                    B_SPK_CC = np.concatenate([pad, B_SPK_CC], axis=-1)
+                    yield ([np.array(B_X), np.array(B_SPK_C), np.expand_dims(B_SPK_CC, axis=-1)],
+                           np.array(B_Y))
+                if mode == 'our_crf-spk_c-spk':
+                    yield ([np.array(B_X), np.array(B_SPK_C), np.array(B_SPK)],
+                           np.array(B_Y))
 
                 B_X, B_Y, B_SPK, B_SPK_C = [], [], [], []
 
@@ -189,7 +198,29 @@ def train(X, Y, SPK, SPK_C, encoder_type, word_embedding_matrix, tag_lb, n_tags,
 
         model = Model([input_X, input_SPK_C], output)
         model.compile(optimizer=LRMultiplier('adam', {'our_crf': crf_lr_multiplier}), loss=crf.loss_wrapper(input_SPK_C), metrics=[])
-        metric_callback = ViterbiAccuracy_OurCRF(validation_data, validation_steps, tag_lb, n_tags)
+        metric_callback = ViterbiAccuracy_OurCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
+
+    if mode == 'our_crf-spk_c-spk_c':
+        input_SPK_C = Input(shape=(None,), dtype='int32')
+        input_SPK_CC = Input(shape=(None, 1), dtype='float32')
+        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
+        crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
+        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK_CC, output])))))
+
+        model = Model([input_X, input_SPK_C, input_SPK_CC], output)
+        model.compile(optimizer=LRMultiplier('adam', {'our_crf': crf_lr_multiplier}), loss=crf.loss_wrapper(input_SPK_C), metrics=[])
+        metric_callback = ViterbiAccuracy_OurCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
+
+    if mode == 'our_crf-spk_c-spk':
+        input_SPK_C = Input(shape=(None,), dtype='int32')
+        input_SPK = Input(shape=(None, n_spks), dtype='float32')
+        dense_layer_crf = Dense(units=n_tags if batch_size == 1 else n_tags + 1)
+        crf = OurCRF(ignore_last_label=False if batch_size == 1 else True)
+        output = crf(dense_layer_crf(dropout_layer(bilstm_layer(concatenate([input_SPK, output])))))
+
+        model = Model([input_X, input_SPK_C, input_SPK], output)
+        model.compile(optimizer=LRMultiplier('adam', {'our_crf': crf_lr_multiplier}), loss=crf.loss_wrapper(input_SPK_C), metrics=[])
+        metric_callback = ViterbiAccuracy_OurCRF(validation_data, validation_steps, tag_lb, n_tags, mode)
 
     model.summary()
     callbacks = [metric_callback] + callbacks
