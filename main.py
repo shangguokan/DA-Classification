@@ -105,9 +105,6 @@ for param in ParameterGrid(param_grid):
     print('the best epoch based on val_viterbi_accuracy:', best_epoch)
     model.load_weights(path_to_results + 'model_on_epoch_end/' + str(best_epoch) + '.h5')
     n_test_samples = len(X['test'])
-    test_loss = model.evaluate_generator(
-        trainer.data_generator('test', X, Y, SPK, SPK_C, mode, batch_size),
-        steps=ceil(n_test_samples/batch_size))
 
     if mode == 'vanilla_crf' or mode == 'vanilla_crf-spk' or mode == 'vanilla_crf-spk_c':
         trans = {}
@@ -203,7 +200,7 @@ for param in ParameterGrid(param_grid):
 
     with open(path_to_results + 'result.json', 'w') as f:
         f.write(json.dumps(
-            dict(((k, eval(k)) for k in ('corpus_name', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'crf_lr_multiplier', 'best_epoch', 'val_loss', 'test_loss', 'unigram_accuracy', 'bigram_accuracy', 'trigram_accuracy')))
+            dict(((k, eval(k)) for k in ('corpus_name', 'encoder_type', 'mode', 'batch_size', 'dropout_rate', 'crf_lr_multiplier', 'best_epoch', 'val_loss', 'unigram_accuracy', 'bigram_accuracy', 'trigram_accuracy')))
         ))
 
     K.clear_session()
