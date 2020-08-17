@@ -8,6 +8,10 @@ git clone --recurse-submodules https://guokan_shang@bitbucket.org/guokan_shang/d
 cd dataset/swda/
 unzip swda.zip
 ```
+3.
+```
+ipython main.py
+```
 requirements:
 ```
 tensorflow                         1.12.0
